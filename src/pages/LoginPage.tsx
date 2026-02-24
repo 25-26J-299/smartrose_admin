@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/Label"
 import { Flower2, Lock, Mail } from "lucide-react"
 import { login } from "@/lib/api"
 
-const ADMIN_ROLES = ["admin", "superadmin"]
+const ADMIN_ROLE = "admin"
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -22,9 +22,9 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const { user } = await login(email, password)
-      const roles = user.roles ?? []
-      const hasAdmin = roles.some((r: string) => ADMIN_ROLES.includes(r.toLowerCase()))
-      if (!hasAdmin) {
+      const u = user as { role?: string; roles?: string[] }
+      const role = (u.role ?? u.roles?.[0] ?? "").toLowerCase()
+      if (role !== ADMIN_ROLE) {
         setError("Your account does not have admin access. Contact an administrator.")
         return
       }

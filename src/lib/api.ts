@@ -19,7 +19,13 @@ export function clearToken(): void {
   localStorage.removeItem(AUTH_KEY)
 }
 
-export async function login(email: string, password: string): Promise<{ token: string; user: { id: string; name: string; email: string; roles: string[] } }> {
+export async function login(
+  email: string,
+  password: string
+): Promise<{
+  token: string
+  user: { id: string; full_name: string; email: string; role: string }
+}> {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -34,24 +40,69 @@ export async function login(email: string, password: string): Promise<{ token: s
   return { token: data.access_token, user: data.user }
 }
 
+function handleUnauthorized(): never {
+  clearToken()
+  window.location.href = "/login"
+  throw new Error("Session expired")
+}
+
 export async function fetchUsers(): Promise<ApiUser[]> {
   const token = getToken()
-  if (!token) throw new Error("Not authenticated")
+  if (!token) handleUnauthorized()
   const res = await fetch(`${API_BASE}/admin/users`, {
     headers: { Authorization: `Bearer ${token}` },
   })
-  if (res.status === 401) throw new Error("Session expired")
+  if (res.status === 401) handleUnauthorized()
   if (res.status === 403) throw new Error("Admin access required")
   if (!res.ok) throw new Error("Failed to fetch users")
   const data = await res.json()
   return data.users ?? []
 }
 
+export async function updateUserRole(userId: string, role: string): Promise<ApiUser> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/users/${userId}/role`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ role }),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) throw new Error("Failed to update role")
+  const data = await res.json()
+  return data.user
+}
+
+export async function updateUserStatus(userId: string, status: string): Promise<ApiUser> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/users/${userId}/status`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ status }),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) throw new Error("Failed to update status")
+  const data = await res.json()
+  return data.user
+}
+
 /** Raw user from backend API */
 export interface ApiUser {
   _id: string
-  name: string
+  full_name: string
   email: string
-  roles: string[]
+  phone?: string
+  role: string
+  status: string
   created_at: string
+  updated_at?: string
+  last_login?: string
+  is_active: boolean
 }
