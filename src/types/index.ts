@@ -3,11 +3,14 @@ export type DeviceType = "INM" | "EOSM" | "EDAS" | "FM"
 export type DeviceStatus = "online" | "offline" | "warning"
 export type GreenhouseStatus = "active" | "inactive"
 
+export type UserStatus = "pending" | "approved" | "rejected"
+
 export interface User {
   id: string
   name: string
   email: string
   role: UserRole
+  status?: UserStatus
   is_active: boolean
   subscription_tier: "basic" | "pro" | "enterprise"
   greenhouse_count: number

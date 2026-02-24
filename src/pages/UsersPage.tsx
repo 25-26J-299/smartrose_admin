@@ -3,26 +3,27 @@ import TopBar from "@/components/layout/TopBar"
 import { Card } from "@/components/ui/Card"
 import { Badge } from "@/components/ui/Badge"
 import { Button } from "@/components/ui/Button"
-import { fetchUsers, type ApiUser } from "@/lib/api"
+import { fetchUsers, updateUserRole, updateUserStatus, type ApiUser } from "@/lib/api"
 import { formatDate } from "@/lib/utils"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table"
 import { UserCheck, UserX, Warehouse, MoreHorizontal, Loader2, AlertCircle } from "lucide-react"
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/DropdownMenu"
-import type { User } from "@/types"
+import type { User, UserStatus } from "@/types"
 
 function mapApiUserToUser(api: ApiUser): User {
-  const roles = api.roles ?? []
-  const primaryRole = roles[0] ?? "farmer"
   const created = typeof api.created_at === "string" ? api.created_at : (api.created_at as { $date?: string })?.$date ?? ""
+  const lastLogin = api.last_login ? (typeof api.last_login === "string" ? api.last_login : (api.last_login as { $date?: string })?.$date ?? "") : undefined
   return {
     id: api._id,
-    name: api.name,
+    name: api.full_name ?? api.email,
     email: api.email,
-    role: primaryRole as User["role"],
-    is_active: true,
+    role: (api.role ?? "farmer") as User["role"],
+    status: (api.status ?? "pending") as UserStatus,
+    is_active: api.is_active ?? true,
     subscription_tier: "basic",
     greenhouse_count: 0,
     created_at: created,
+    last_login: lastLogin,
   }
 }
 
@@ -31,9 +32,17 @@ const roleBadge = (role: string) => {
     farmer: "bg-green-100 text-green-700",
     florist: "bg-purple-100 text-purple-700",
     admin: "bg-blue-100 text-blue-700",
-    superadmin: "bg-red-100 text-red-700",
   }
   return map[role] ?? "bg-gray-100 text-gray-700"
+}
+
+const statusBadge = (status: string) => {
+  const map: Record<string, string> = {
+    pending: "bg-amber-100 text-amber-700",
+    approved: "bg-green-100 text-green-700",
+    rejected: "bg-red-100 text-red-700",
+  }
+  return map[status] ?? "bg-gray-100 text-gray-700"
 }
 
 const tierBadge = (tier: string) => {
@@ -49,6 +58,49 @@ export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+
+  const refreshUsers = () => {
+    fetchUsers()
+      .then((apiUsers) => setUsers(apiUsers.map(mapApiUserToUser)))
+      .catch(() => setError("Failed to refresh"))
+  }
+
+  const handleApprove = async (userId: string) => {
+    setUpdatingId(userId)
+    try {
+      await updateUserStatus(userId, "approved")
+      refreshUsers()
+    } catch {
+      setError("Failed to approve user")
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  const handleReject = async (userId: string) => {
+    setUpdatingId(userId)
+    try {
+      await updateUserStatus(userId, "rejected")
+      refreshUsers()
+    } catch {
+      setError("Failed to reject user")
+    } finally {
+      setUpdatingId(null)
+    }
+  }
+
+  const handleChangeRole = async (userId: string, newRole: "farmer" | "florist" | "admin") => {
+    setUpdatingId(userId)
+    try {
+      await updateUserRole(userId, newRole)
+      refreshUsers()
+    } catch {
+      setError("Failed to update role")
+    } finally {
+      setUpdatingId(null)
+    }
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -86,13 +138,18 @@ export default function UsersPage() {
   }
 
   if (error) {
+    const isSessionExpired = error.toLowerCase().includes("session expired") || error.toLowerCase().includes("not authenticated")
     return (
       <div className="flex flex-col h-full overflow-hidden">
         <TopBar title="Users" subtitle="Manage all registered users across the platform." />
         <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6">
           <AlertCircle className="w-10 h-10 text-red-500" />
           <p className="text-sm text-muted-foreground text-center">{error}</p>
-          <Button onClick={() => window.location.reload()}>Retry</Button>
+          {isSessionExpired ? (
+            <Button onClick={() => { window.location.href = "/login" }}>Sign in again</Button>
+          ) : (
+            <Button onClick={() => window.location.reload()}>Retry</Button>
+          )}
         </div>
       </div>
     )
@@ -131,6 +188,7 @@ export default function UsersPage() {
                   <TableHead className="text-xs">Plan</TableHead>
                   <TableHead className="text-xs">Greenhouses</TableHead>
                   <TableHead className="text-xs">Status</TableHead>
+                  <TableHead className="text-xs">Approval</TableHead>
                   <TableHead className="text-xs">Joined</TableHead>
                   <TableHead className="text-xs">Last Login</TableHead>
                   <TableHead className="text-xs w-10"></TableHead>
@@ -177,25 +235,31 @@ export default function UsersPage() {
                         </div>
                       )}
                     </TableCell>
+                    <TableCell>
+                      <Badge className={`${statusBadge(user.status ?? "pending")} border-0 text-xs capitalize`}>
+                        {user.status ?? "pending"}
+                      </Badge>
+                    </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{formatDate(user.created_at)}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{user.last_login ? formatDate(user.last_login) : "—"}</TableCell>
                     <TableCell>
                       <DropdownMenu
                         trigger={
-                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" disabled={updatingId === user.id}>
                             <MoreHorizontal className="w-4 h-4" />
                           </Button>
                         }
                       >
-                        <DropdownMenuItem>View Profile</DropdownMenuItem>
-                        <DropdownMenuItem>View Greenhouses</DropdownMenuItem>
-                        <DropdownMenuItem>Change Role</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        {user.is_active ? (
-                          <DropdownMenuItem className="text-red-500">Deactivate Account</DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem className="text-green-600">Activate Account</DropdownMenuItem>
+                        {user.status === "pending" && (
+                          <>
+                            <DropdownMenuItem onClick={() => handleApprove(user.id)}>Approve</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleReject(user.id)} className="text-red-500">Reject</DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                          </>
                         )}
+                        <DropdownMenuItem onClick={() => handleChangeRole(user.id, "farmer")}>Set Role: Farmer</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleChangeRole(user.id, "florist")}>Set Role: Florist</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleChangeRole(user.id, "admin")}>Set Role: Admin</DropdownMenuItem>
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
