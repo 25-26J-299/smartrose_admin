@@ -46,10 +46,11 @@ function handleUnauthorized(): never {
   throw new Error("Session expired")
 }
 
-export async function fetchUsers(): Promise<ApiUser[]> {
+export async function fetchUsers(status?: "approved" | "pending" | "rejected"): Promise<ApiUser[]> {
   const token = getToken()
   if (!token) handleUnauthorized()
-  const res = await fetch(`${API_BASE}/admin/users`, {
+  const url = status ? `${API_BASE}/admin/users?status=${status}` : `${API_BASE}/admin/users`
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (res.status === 401) handleUnauthorized()
@@ -93,6 +94,62 @@ export async function updateUserStatus(userId: string, status: string): Promise<
   return data.user
 }
 
+export async function fetchUserWithLocations(userId: string): Promise<{
+  user: ApiUser
+  locations: ApiLocation[]
+}> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/users/${userId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("User not found")
+  if (!res.ok) throw new Error("Failed to fetch user")
+  const data = await res.json()
+  return { user: data.user, locations: data.locations ?? [] }
+}
+
+export async function updateUser(
+  userId: string,
+  data: { full_name?: string; phone?: string; role?: string }
+): Promise<ApiUser> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/users/${userId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) throw new Error("Failed to update user")
+  const json = await res.json()
+  return json.user
+}
+
+export async function updateLocation(
+  locationId: string,
+  data: { name?: string; type?: string; address?: string }
+): Promise<ApiLocation> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/locations/${locationId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) throw new Error("Failed to update location")
+  const json = await res.json()
+  return json.location
+}
+
 /** Raw user from backend API */
 export interface ApiUser {
   _id: string
@@ -105,4 +162,16 @@ export interface ApiUser {
   updated_at?: string
   last_login?: string
   is_active: boolean
+}
+
+/** Raw location from backend API */
+export interface ApiLocation {
+  _id: string
+  user_id: string
+  name: string
+  type: string
+  address: string
+  created_at?: string
+  updated_at?: string
+  is_active?: boolean
 }
