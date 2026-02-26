@@ -6,8 +6,9 @@ import { Button } from "@/components/ui/Button"
 import { fetchUsers, updateUserRole, updateUserStatus, type ApiUser } from "@/lib/api"
 import { formatDate } from "@/lib/utils"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table"
-import { UserCheck, UserX, Warehouse, MoreHorizontal, Loader2, AlertCircle } from "lucide-react"
+import { UserCheck, UserX, Warehouse, MoreHorizontal, Loader2, AlertCircle, FileSearch } from "lucide-react"
 import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/DropdownMenu"
+import { UserReviewModal } from "@/components/UserReviewModal"
 import type { User, UserStatus } from "@/types"
 
 function mapApiUserToUser(api: ApiUser): User {
@@ -54,14 +55,19 @@ const tierBadge = (tier: string) => {
   return map[tier] ?? "bg-gray-100 text-gray-700"
 }
 
-export default function UsersPage() {
+interface UsersPageProps {
+  statusFilter?: "approved" | "pending"
+}
+
+export default function UsersPage({ statusFilter = "approved" }: UsersPageProps) {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [reviewUserId, setReviewUserId] = useState<string | null>(null)
 
   const refreshUsers = () => {
-    fetchUsers()
+    fetchUsers(statusFilter)
       .then((apiUsers) => setUsers(apiUsers.map(mapApiUserToUser)))
       .catch(() => setError("Failed to refresh"))
   }
@@ -106,7 +112,7 @@ export default function UsersPage() {
     let cancelled = false
     setLoading(true)
     setError(null)
-    fetchUsers()
+    fetchUsers(statusFilter)
       .then((apiUsers) => {
         if (!cancelled) {
           setUsers(apiUsers.map(mapApiUserToUser))
@@ -121,7 +127,7 @@ export default function UsersPage() {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [])
+  }, [statusFilter])
 
   const activeCount = users.filter((u) => u.is_active).length
   const inactiveCount = users.length - activeCount
@@ -155,9 +161,14 @@ export default function UsersPage() {
     )
   }
 
+  const isPendingPage = statusFilter === "pending"
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <TopBar title="Users" subtitle="Manage all registered users across the platform." />
+      <TopBar
+        title={isPendingPage ? "Pending Users" : "Users"}
+        subtitle={isPendingPage ? "Users awaiting approval." : "Approved users across the platform."}
+      />
 
       <div className="flex-1 overflow-y-auto p-6 space-y-5">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -176,7 +187,7 @@ export default function UsersPage() {
 
         <Card className="border shadow-none overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <p className="text-sm font-semibold">All Users</p>
+            <p className="text-sm font-semibold">{isPendingPage ? "Pending Users" : "Approved Users"}</p>
             <Button size="sm" className="h-8 text-xs">+ Invite User</Button>
           </div>
           <div className="overflow-x-auto">
@@ -192,6 +203,7 @@ export default function UsersPage() {
                   <TableHead className="text-xs">Joined</TableHead>
                   <TableHead className="text-xs">Last Login</TableHead>
                   <TableHead className="text-xs w-10"></TableHead>
+                  <TableHead className="text-xs w-24">Review</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -262,6 +274,17 @@ export default function UsersPage() {
                         <DropdownMenuItem onClick={() => handleChangeRole(user.id, "admin")}>Set Role: Admin</DropdownMenuItem>
                       </DropdownMenu>
                     </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => setReviewUserId(user.id)}
+                        title="Review"
+                      >
+                        <FileSearch className="w-4 h-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -269,6 +292,13 @@ export default function UsersPage() {
           </div>
         </Card>
       </div>
+
+      <UserReviewModal
+        userId={reviewUserId ?? ""}
+        open={reviewUserId !== null}
+        onClose={() => setReviewUserId(null)}
+        onSuccess={refreshUsers}
+      />
     </div>
   )
 }

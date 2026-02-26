@@ -3,6 +3,7 @@ import { clearToken } from "@/lib/api"
 import {
   LayoutDashboard,
   Users,
+  Clock,
   Warehouse,
   Cpu,
   BarChart3,
@@ -19,7 +20,8 @@ import { Badge } from "@/components/ui/Badge"
 
 const navItems = [
   { href: "/overview", label: "Overview", icon: LayoutDashboard },
-  { href: "/users", label: "Users", icon: Users, badge: "248" },
+  { href: "/users", label: "Users", icon: Users },
+  { href: "/pending-users", label: "Pending Users", icon: Clock },
   { href: "/greenhouses", label: "Greenhouses", icon: Warehouse, badge: "87" },
   { href: "/devices", label: "Devices", icon: Cpu, badge: "23 offline" },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },

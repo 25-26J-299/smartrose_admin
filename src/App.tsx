@@ -16,7 +16,8 @@ export default function App() {
       <Route path="/" element={<DashboardLayout />}>
         <Route index element={<Navigate to="/overview" replace />} />
         <Route path="overview" element={<OverviewPage />} />
-        <Route path="users" element={<UsersPage />} />
+        <Route path="users" element={<UsersPage statusFilter="approved" />} />
+        <Route path="pending-users" element={<UsersPage statusFilter="pending" />} />
         <Route path="greenhouses" element={<GreenhousesPage />} />
         <Route path="devices" element={<DevicesPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
