@@ -164,6 +164,97 @@ export interface ApiUser {
   is_active: boolean
 }
 
+export async function searchApprovedUsers(query: string): Promise<SearchResult[]> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/search?q=${encodeURIComponent(query)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) throw new Error("Search failed")
+  const data = await res.json()
+  return data.results ?? []
+}
+
+export async function createDevice(data: {
+  location_id: string
+  user_id: string
+  name: string
+  type: string
+  device_serial_number: string
+}): Promise<ApiDevice> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/devices`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to create device")
+  }
+  const json = await res.json()
+  return json.device
+}
+
+export async function fetchDevices(params?: {
+  location_id?: string
+  user_id?: string
+}): Promise<ApiDevice[]> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const search = new URLSearchParams(params as Record<string, string>).toString()
+  const url = search ? `${API_BASE}/admin/devices?${search}` : `${API_BASE}/admin/devices`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) throw new Error("Failed to fetch devices")
+  const data = await res.json()
+  return data.devices ?? []
+}
+
+export async function fetchDeviceSensorData(
+  deviceId: string,
+  limit?: number
+): Promise<{ device: ApiDevice; readings: unknown[]; count: number }> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const url = limit
+    ? `${API_BASE}/admin/devices/${deviceId}/sensor-data?limit=${limit}`
+    : `${API_BASE}/admin/devices/${deviceId}/sensor-data`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("Device not found")
+  if (!res.ok) throw new Error("Failed to fetch sensor data")
+  const data = await res.json()
+  return {
+    device: data.device,
+    readings: data.readings ?? [],
+    count: data.count ?? 0,
+  }
+}
+
+export interface SearchResult {
+  user: ApiUser
+  locations: ApiLocation[]
+}
+
+export interface ApiDevice {
+  _id: string
+  location_id: string
+  user_id: string
+  name: string
+  type: string
+  device_serial_number: string
+  last_seen?: string
+  created_at?: string
+  updated_at?: string
+}
+
 /** Raw location from backend API */
 export interface ApiLocation {
   _id: string
