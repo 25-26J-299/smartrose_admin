@@ -40,6 +40,36 @@ export async function login(
   return { token: data.access_token, user: data.user }
 }
 
+export async function inviteUser(data: {
+  full_name: string
+  email: string
+  phone?: string
+  password: string
+  role: "farmer" | "florist"
+  location: {
+    name: string
+    type: "greenhouse" | "flower_shop"
+    address: string
+  }
+}): Promise<ApiUser> {
+  const token = getToken()
+  const res = await fetch(`${API_BASE}/auth/register`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(data),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to invite user")
+  }
+  const json = await res.json()
+  return json.user
+}
+
 function handleUnauthorized(): never {
   clearToken()
   window.location.href = "/login"
@@ -112,7 +142,7 @@ export async function fetchUserWithLocations(userId: string): Promise<{
 
 export async function updateUser(
   userId: string,
-  data: { full_name?: string; phone?: string; role?: string }
+  data: { full_name?: string; phone?: string; role?: string; is_active?: boolean }
 ): Promise<ApiUser> {
   const token = getToken()
   if (!token) handleUnauthorized()
@@ -130,9 +160,26 @@ export async function updateUser(
   return json.user
 }
 
+export async function deleteUser(userId: string): Promise<void> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/users/${userId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("User not found")
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to delete user")
+  }
+}
+
 export async function updateLocation(
   locationId: string,
-  data: { name?: string; type?: string; address?: string }
+  data: { name?: string; type?: string; address?: string; is_active?: boolean }
 ): Promise<ApiLocation> {
   const token = getToken()
   if (!token) handleUnauthorized()
@@ -150,6 +197,65 @@ export async function updateLocation(
   return json.location
 }
 
+export async function deleteLocation(locationId: string): Promise<void> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/locations/${locationId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("Location not found")
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to delete location")
+  }
+}
+
+export async function fetchLocations(): Promise<ApiLocation[]> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/locations`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) throw new Error("Failed to fetch locations")
+  const data = await res.json()
+  return data.locations ?? []
+}
+
+export async function createGreenhouse(data: {
+  user_id: string
+  name: string
+  address: string
+}): Promise<ApiLocation> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/locations`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      user_id: data.user_id,
+      name: data.name,
+      type: "greenhouse",
+      address: data.address,
+    }),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("User not found")
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to create greenhouse")
+  }
+  const json = await res.json()
+  return json.location
+}
+
 /** Raw user from backend API */
 export interface ApiUser {
   _id: string
@@ -162,6 +268,7 @@ export interface ApiUser {
   updated_at?: string
   last_login?: string
   is_active: boolean
+  greenhouse_count?: number
 }
 
 export async function searchApprovedUsers(query: string): Promise<SearchResult[]> {
@@ -217,6 +324,47 @@ export async function fetchDevices(params?: {
   return data.devices ?? []
 }
 
+export async function updateDevice(
+  deviceId: string,
+  data: { name?: string; type?: string; device_serial_number?: string }
+): Promise<ApiDevice> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/devices/${deviceId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("Device not found")
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to update device")
+  }
+  const json = await res.json()
+  return json.device
+}
+
+export async function deleteDevice(deviceId: string): Promise<void> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/devices/${deviceId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("Device not found")
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to delete device")
+  }
+}
+
 export async function fetchDeviceSensorData(
   deviceId: string,
   limit?: number
@@ -250,6 +398,8 @@ export interface ApiDevice {
   name: string
   type: string
   device_serial_number: string
+  location_name?: string
+  user_name?: string
   last_seen?: string
   created_at?: string
   updated_at?: string
@@ -262,6 +412,8 @@ export interface ApiLocation {
   name: string
   type: string
   address: string
+  owner_name?: string
+  owner_email?: string
   created_at?: string
   updated_at?: string
   is_active?: boolean
