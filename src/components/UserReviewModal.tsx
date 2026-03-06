@@ -4,6 +4,7 @@ import {
   updateUser,
   updateLocation,
   updateUserStatus,
+  deleteUser,
   type ApiUser,
   type ApiLocation,
 } from "@/lib/api"
@@ -13,7 +14,7 @@ import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
 import { Label } from "@/components/ui/Label"
 import { Badge } from "@/components/ui/Badge"
-import { UserCheck, UserX, Loader2, Edit2, Save, X } from "lucide-react"
+import { UserCheck, UserX, Loader2, Edit2, Save, X, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface UserReviewModalProps {
@@ -21,6 +22,8 @@ interface UserReviewModalProps {
   open: boolean
   onClose: () => void
   onSuccess: () => void
+  showAccountState?: boolean
+  showDeleteAction?: boolean
 }
 
 const statusBadge = (status: string) => {
@@ -46,6 +49,8 @@ export function UserReviewModal({
   open,
   onClose,
   onSuccess,
+  showAccountState = true,
+  showDeleteAction = true,
 }: UserReviewModalProps) {
   const [user, setUser] = useState<ApiUser | null>(null)
   const [locations, setLocations] = useState<ApiLocation[]>([])
@@ -53,40 +58,43 @@ export function UserReviewModal({
   const [error, setError] = useState<string | null>(null)
   const [actioning, setActioning] = useState(false)
   const [editMode, setEditMode] = useState(false)
-  const [editUser, setEditUser] = useState({ full_name: "", phone: "", role: "" })
+  const [editUser, setEditUser] = useState({ full_name: "", phone: "", role: "", is_active: true })
   const [editLocations, setEditLocations] = useState<
     Record<string, { name: string; type: string; address: string }>
   >({})
 
-  const loadData = () => {
+  const loadData = async () => {
     if (!userId || !open) return
     setLoading(true)
     setError(null)
-    fetchUserWithLocations(userId)
-      .then(({ user: u, locations: locs }) => {
-        setUser(u)
-        setLocations(locs)
-        setEditUser({
-          full_name: u.full_name ?? "",
-          phone: u.phone ?? "",
-          role: u.role ?? "farmer",
-        })
-        const locEdits: Record<string, { name: string; type: string; address: string }> = {}
-        locs.forEach((l) => {
-          locEdits[l._id] = {
-            name: l.name ?? "",
-            type: l.type ?? "greenhouse",
-            address: l.address ?? "",
-          }
-        })
-        setEditLocations(locEdits)
+    try {
+      const { user: u, locations: locs } = await fetchUserWithLocations(userId)
+      setUser(u)
+      setLocations(locs)
+      setEditUser({
+        full_name: u.full_name ?? "",
+        phone: u.phone ?? "",
+        role: u.role ?? "farmer",
+        is_active: u.is_active ?? true,
       })
-      .catch((e) => setError(e instanceof Error ? e.message : "Failed to load"))
-      .finally(() => setLoading(false))
+      const locEdits: Record<string, { name: string; type: string; address: string }> = {}
+      locs.forEach((l) => {
+        locEdits[l._id] = {
+          name: l.name ?? "",
+          type: l.type ?? "greenhouse",
+          address: l.address ?? "",
+        }
+      })
+      setEditLocations(locEdits)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load")
+    } finally {
+      setLoading(false)
+    }
   }
 
   useEffect(() => {
-    if (open && userId) loadData()
+    if (open && userId) void loadData()
   }, [open, userId])
 
   const handleApprove = async () => {
@@ -122,20 +130,25 @@ export function UserReviewModal({
     setActioning(true)
     setError(null)
     try {
-      await updateUser(user._id, {
+      const updatedUser = await updateUser(user._id, {
         full_name: editUser.full_name || undefined,
         phone: editUser.phone || undefined,
         role: editUser.role || undefined,
+        is_active: editUser.is_active,
       })
-      for (const [locId, data] of Object.entries(editLocations)) {
-        await updateLocation(locId, {
+      await Promise.all(
+        Object.entries(editLocations).map(([locId, data]) =>
+          updateLocation(locId, {
           name: data.name || undefined,
           type: data.type || undefined,
           address: data.address || undefined,
-        })
-      }
-      loadData()
+          })
+        )
+      )
+      setUser(updatedUser)
       setEditMode(false)
+      onSuccess()
+      void loadData()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save")
     } finally {
@@ -150,6 +163,7 @@ export function UserReviewModal({
         full_name: user.full_name ?? "",
         phone: user.phone ?? "",
         role: user.role ?? "farmer",
+        is_active: user.is_active ?? true,
       })
       const locEdits: Record<string, { name: string; type: string; address: string }> = {}
       locations.forEach((l) => {
@@ -160,6 +174,24 @@ export function UserReviewModal({
         }
       })
       setEditLocations(locEdits)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!user) return
+    const confirmed = window.confirm(`Delete user "${user.full_name ?? user.email}"? This action cannot be undone.`)
+    if (!confirmed) return
+
+    setActioning(true)
+    setError(null)
+    try {
+      await deleteUser(user._id)
+      onSuccess()
+      onClose()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete user")
+    } finally {
+      setActioning(false)
     }
   }
 
@@ -228,6 +260,21 @@ export function UserReviewModal({
                     <option value="admin">Admin</option>
                   </select>
                 </div>
+                {showAccountState && (
+                  <div>
+                    <Label>Account State</Label>
+                    <select
+                      value={editUser.is_active ? "active" : "inactive"}
+                      onChange={(e) =>
+                        setEditUser((p) => ({ ...p, is_active: e.target.value === "active" }))
+                      }
+                      className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="rounded-lg border p-4 space-y-2 text-sm">
@@ -255,6 +302,19 @@ export function UserReviewModal({
                     {user.status}
                   </Badge>
                 </div>
+                {showAccountState && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Account State</span>
+                    <Badge
+                      className={cn(
+                        user.is_active ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700",
+                        "border-0"
+                      )}
+                    >
+                      {user.is_active ? "active" : "inactive"}
+                    </Badge>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Joined</span>
                   <span>{formatDate(user.created_at)}</span>
@@ -401,11 +461,27 @@ export function UserReviewModal({
                 <Button
                   variant="outline"
                   onClick={() => setEditMode(true)}
+                  disabled={actioning}
                   className="gap-2"
                 >
                   <Edit2 className="h-4 w-4" />
                   Edit
                 </Button>
+                {showDeleteAction && (
+                  <Button
+                    variant="destructive"
+                    onClick={handleDelete}
+                    disabled={actioning}
+                    className="gap-2"
+                  >
+                    {actioning ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                    Delete
+                  </Button>
+                )}
                 {user.status === "pending" && (
                   <>
                     <Button
