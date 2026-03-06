@@ -16,14 +16,13 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
-import { Badge } from "@/components/ui/Badge"
 
 const navItems = [
   { href: "/overview", label: "Overview", icon: LayoutDashboard },
   { href: "/users", label: "Users", icon: Users },
   { href: "/pending-users", label: "Pending Users", icon: Clock },
-  { href: "/greenhouses", label: "Greenhouses", icon: Warehouse, badge: "87" },
-  { href: "/devices", label: "Devices", icon: Cpu, badge: "23 offline" },
+  { href: "/greenhouses", label: "Greenhouses", icon: Warehouse },
+  { href: "/devices", label: "Devices", icon: Cpu },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/system", label: "System Health", icon: Activity },
   { href: "/audit-logs", label: "Audit Logs", icon: ScrollText },
@@ -53,7 +52,7 @@ export default function Sidebar() {
       </div>
 
       <nav className="flex-1 overflow-y-auto py-4 px-2 space-y-1">
-        {navItems.map(({ href, label, icon: Icon, badge }) => {
+        {navItems.map(({ href, label, icon: Icon }) => {
           const active = location.pathname === href || location.pathname.startsWith(href + "/")
           return (
             <Link
@@ -70,16 +69,6 @@ export default function Sidebar() {
               {!collapsed && (
                 <>
                   <span className="flex-1">{label}</span>
-                  {badge && (
-                    <Badge
-                      className={cn(
-                        "text-[10px] px-1.5 py-0 border-0",
-                        badge.includes("offline") ? "bg-red-500/20 text-red-300" : "bg-white/10 text-slate-400"
-                      )}
-                    >
-                      {badge}
-                    </Badge>
-                  )}
                 </>
               )}
             </Link>
