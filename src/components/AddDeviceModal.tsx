@@ -120,7 +120,7 @@ export function AddDeviceModal({
   return (
     <Dialog open={open} onClose={handleClose} title="Add Device" className="max-w-xl">
       <div className="space-y-2">
-        <Label>Search approved user (email, phone, or location name)</Label>
+        <Label>Search approved user (email, phone, or company name)</Label>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
