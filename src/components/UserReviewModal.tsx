@@ -58,7 +58,7 @@ export function UserReviewModal({
   const [error, setError] = useState<string | null>(null)
   const [actioning, setActioning] = useState(false)
   const [editMode, setEditMode] = useState(false)
-  const [editUser, setEditUser] = useState({ full_name: "", phone: "", role: "", is_active: true })
+  const [editUser, setEditUser] = useState({ full_name: "", phone: "", farmer: false, florist: false, is_active: true })
   const [editLocations, setEditLocations] = useState<
     Record<string, { name: string; type: string; address: string }>
   >({})
@@ -71,10 +71,12 @@ export function UserReviewModal({
       const { user: u, locations: locs } = await fetchUserWithLocations(userId)
       setUser(u)
       setLocations(locs)
+      const userRoles = u.roles?.length ? u.roles : [u.role ?? "farmer"]
       setEditUser({
         full_name: u.full_name ?? "",
         phone: u.phone ?? "",
-        role: u.role ?? "farmer",
+        farmer: userRoles.includes("farmer"),
+        florist: userRoles.includes("florist"),
         is_active: u.is_active ?? true,
       })
       const locEdits: Record<string, { name: string; type: string; address: string }> = {}
@@ -130,10 +132,14 @@ export function UserReviewModal({
     setActioning(true)
     setError(null)
     try {
+      const roles = [
+        ...(editUser.farmer ? ["farmer"] : []),
+        ...(editUser.florist ? ["florist"] : []),
+      ]
       const updatedUser = await updateUser(user._id, {
         full_name: editUser.full_name || undefined,
         phone: editUser.phone || undefined,
-        role: editUser.role || undefined,
+        roles: roles.length > 0 ? roles : undefined,
         is_active: editUser.is_active,
       })
       await Promise.all(
@@ -158,13 +164,15 @@ export function UserReviewModal({
 
   const handleCancelEdit = () => {
     setEditMode(false)
-    if (user) {
-      setEditUser({
-        full_name: user.full_name ?? "",
-        phone: user.phone ?? "",
-        role: user.role ?? "farmer",
-        is_active: user.is_active ?? true,
-      })
+      if (user) {
+        const userRoles = user.roles?.length ? user.roles : [user.role ?? "farmer"]
+        setEditUser({
+          full_name: user.full_name ?? "",
+          phone: user.phone ?? "",
+          farmer: userRoles.includes("farmer"),
+          florist: userRoles.includes("florist"),
+          is_active: user.is_active ?? true,
+        })
       const locEdits: Record<string, { name: string; type: string; address: string }> = {}
       locations.forEach((l) => {
         locEdits[l._id] = {
@@ -247,18 +255,28 @@ export function UserReviewModal({
                   />
                 </div>
                 <div>
-                  <Label>Role</Label>
-                  <select
-                    value={editUser.role}
-                    onChange={(e) =>
-                      setEditUser((p) => ({ ...p, role: e.target.value }))
-                    }
-                    className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  >
-                    <option value="farmer">Farmer</option>
-                    <option value="florist">Florist</option>
-                    <option value="admin">Admin</option>
-                  </select>
+                  <Label>Role(s)</Label>
+                  <p className="text-xs text-muted-foreground mb-2">Select one or both roles</p>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editUser.farmer}
+                        onChange={(e) => setEditUser((p) => ({ ...p, farmer: e.target.checked }))}
+                        className="w-4 h-4 rounded border-input accent-primary"
+                      />
+                      <span className="text-sm font-medium">Farmer</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editUser.florist}
+                        onChange={(e) => setEditUser((p) => ({ ...p, florist: e.target.checked }))}
+                        className="w-4 h-4 rounded border-input accent-primary"
+                      />
+                      <span className="text-sm font-medium">Florist</span>
+                    </label>
+                  </div>
                 </div>
                 {showAccountState && (
                   <div>
@@ -291,10 +309,14 @@ export function UserReviewModal({
                   <span>{user.phone || "—"}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Role</span>
-                  <Badge className={cn(roleBadge(user.role), "border-0")}>
-                    {user.role}
-                  </Badge>
+                  <span className="text-muted-foreground">Role(s)</span>
+                  <div className="flex gap-1 flex-wrap justify-end">
+                    {(user.roles?.length ? user.roles : [user.role]).map((r) => (
+                      <Badge key={r} className={cn(roleBadge(r), "border-0 capitalize")}>
+                        {r}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Status</span>

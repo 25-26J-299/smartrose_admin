@@ -20,7 +20,8 @@ export function AddUserModal({ open, onClose, onSuccess }: AddUserModalProps) {
     email: "",
     phone: "",
     password: "",
-    role: "farmer" as "farmer" | "florist",
+    farmer: true,
+    florist: false,
     location_name: "",
     location_type: "greenhouse" as "greenhouse" | "flower_shop",
     location_address: "",
@@ -34,7 +35,8 @@ export function AddUserModal({ open, onClose, onSuccess }: AddUserModalProps) {
       email: "",
       phone: "",
       password: "",
-      role: "farmer",
+      farmer: true,
+      florist: false,
       location_name: "",
       location_type: "greenhouse",
       location_address: "",
@@ -47,10 +49,18 @@ export function AddUserModal({ open, onClose, onSuccess }: AddUserModalProps) {
       setError("Name, email, and password are required")
       return
     }
+    if (!form.farmer && !form.florist) {
+      setError("Please select at least one role")
+      return
+    }
     if (!form.location_name.trim() || !form.location_address.trim()) {
       setError("Company name and address are required")
       return
     }
+    const roles: ("farmer" | "florist")[] = [
+      ...(form.farmer ? (["farmer"] as const) : []),
+      ...(form.florist ? (["florist"] as const) : []),
+    ]
     setSubmitting(true)
     setError(null)
     try {
@@ -59,7 +69,7 @@ export function AddUserModal({ open, onClose, onSuccess }: AddUserModalProps) {
         email: form.email.trim(),
         phone: form.phone.trim() || undefined,
         password: form.password,
-        role: form.role,
+        roles,
         location: {
           name: form.location_name.trim(),
           type: form.location_type,
@@ -113,15 +123,28 @@ export function AddUserModal({ open, onClose, onSuccess }: AddUserModalProps) {
           />
         </div>
         <div>
-          <Label>Role</Label>
-          <select
-            value={form.role}
-            onChange={(e) => setForm((p) => ({ ...p, role: e.target.value as "farmer" | "florist" }))}
-            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          >
-            <option value="farmer">Farmer</option>
-            <option value="florist">Florist</option>
-          </select>
+          <Label>Role(s)</Label>
+          <p className="text-xs text-muted-foreground mb-2">Select one or both roles</p>
+          <div className="flex gap-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.farmer}
+                onChange={(e) => setForm((p) => ({ ...p, farmer: e.target.checked }))}
+                className="w-4 h-4 rounded border-input accent-primary"
+              />
+              <span className="text-sm font-medium">Farmer</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.florist}
+                onChange={(e) => setForm((p) => ({ ...p, florist: e.target.checked }))}
+                className="w-4 h-4 rounded border-input accent-primary"
+              />
+              <span className="text-sm font-medium">Florist</span>
+            </label>
+          </div>
         </div>
         <div className="pt-2 border-t">
           <p className="text-sm font-medium mb-3">Initial Location</p>
