@@ -10,6 +10,7 @@ export interface User {
   name: string
   email: string
   role: UserRole
+  roles?: UserRole[]
   status?: UserStatus
   is_active: boolean
   subscription_tier: "basic" | "pro" | "enterprise"

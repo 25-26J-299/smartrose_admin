@@ -45,7 +45,7 @@ export async function inviteUser(data: {
   email: string
   phone?: string
   password: string
-  role: "farmer" | "florist"
+  roles: ("farmer" | "florist")[]
   location: {
     name: string
     type: "greenhouse" | "flower_shop"
@@ -142,7 +142,7 @@ export async function fetchUserWithLocations(userId: string): Promise<{
 
 export async function updateUser(
   userId: string,
-  data: { full_name?: string; phone?: string; role?: string; is_active?: boolean }
+  data: { full_name?: string; phone?: string; role?: string; roles?: string[]; is_active?: boolean }
 ): Promise<ApiUser> {
   const token = getToken()
   if (!token) handleUnauthorized()
@@ -263,6 +263,7 @@ export interface ApiUser {
   email: string
   phone?: string
   role: string
+  roles: string[]
   status: string
   created_at: string
   updated_at?: string

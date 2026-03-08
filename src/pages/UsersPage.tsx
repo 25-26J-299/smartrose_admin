@@ -15,11 +15,13 @@ import type { User, UserStatus } from "@/types"
 function mapApiUserToUser(api: ApiUser): User {
   const created = typeof api.created_at === "string" ? api.created_at : (api.created_at as { $date?: string })?.$date ?? ""
   const lastLogin = api.last_login ? (typeof api.last_login === "string" ? api.last_login : (api.last_login as { $date?: string })?.$date ?? "") : undefined
+  const allRoles = (api.roles?.length ? api.roles : [api.role ?? "farmer"]) as User["roles"]
   return {
     id: api._id,
     name: api.full_name ?? api.email,
     email: api.email,
     role: (api.role ?? "farmer") as User["role"],
+    roles: allRoles,
     status: (api.status ?? "pending") as UserStatus,
     is_active: api.is_active ?? true,
     subscription_tier: "basic",
@@ -91,15 +93,16 @@ export default function UsersPage({ statusFilter = "approved" }: UsersPageProps)
 
   const activeCount = users.filter((u) => u.is_active).length
   const inactiveCount = users.length - activeCount
-  const roleOptions = Array.from(new Set(users.map((u) => u.role))).sort()
+  const roleOptions = Array.from(new Set(users.flatMap((u) => u.roles ?? [u.role]))).sort()
   const filteredUsers = users.filter((user) => {
     const q = searchQuery.trim().toLowerCase()
+    const userRolesList = user.roles ?? [user.role]
     const matchesSearch =
       q.length === 0 ||
       user.name.toLowerCase().includes(q) ||
       user.email.toLowerCase().includes(q) ||
-      user.role.toLowerCase().includes(q)
-    const matchesRole = roleFilter === "all" || user.role === roleFilter
+      userRolesList.some((r) => r.toLowerCase().includes(q))
+    const matchesRole = roleFilter === "all" || userRolesList.includes(roleFilter as User["role"])
     const matchesAccount =
       isPendingPage ||
       accountFilter === "all" ||
@@ -248,7 +251,11 @@ export default function UsersPage({ statusFilter = "approved" }: UsersPageProps)
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={`${roleBadge(user.role)} border-0 text-xs capitalize`}>{user.role}</Badge>
+                      <div className="flex gap-1 flex-wrap">
+                        {(user.roles ?? [user.role]).map((r) => (
+                          <Badge key={r} className={`${roleBadge(r)} border-0 text-xs capitalize`}>{r}</Badge>
+                        ))}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1.5 text-sm">
