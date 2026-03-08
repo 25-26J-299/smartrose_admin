@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage'
 import OverviewPage from './pages/OverviewPage'
 import UsersPage from './pages/UsersPage'
 import GreenhousesPage from './pages/GreenhousesPage'
+import FlowerShopsPage from './pages/FlowerShopsPage'
 import DevicesPage from './pages/DevicesPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import SystemPage from './pages/SystemPage'
@@ -19,6 +20,7 @@ export default function App() {
         <Route path="users" element={<UsersPage statusFilter="approved" />} />
         <Route path="pending-users" element={<UsersPage statusFilter="pending" />} />
         <Route path="greenhouses" element={<GreenhousesPage />} />
+        <Route path="flower-shops" element={<FlowerShopsPage />} />
         <Route path="devices" element={<DevicesPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="system" element={<SystemPage />} />

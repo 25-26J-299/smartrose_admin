@@ -11,6 +11,7 @@ import {
   ScrollText,
   LogOut,
   Flower2,
+  Store,
   ChevronLeft,
   ChevronRight,
 } from "lucide-react"
@@ -22,6 +23,7 @@ const navItems = [
   { href: "/users", label: "Users", icon: Users },
   { href: "/pending-users", label: "Pending Users", icon: Clock },
   { href: "/greenhouses", label: "Greenhouses", icon: Warehouse },
+  { href: "/flower-shops", label: "Flower Shops", icon: Store },
   { href: "/devices", label: "Devices", icon: Cpu },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/system", label: "System Health", icon: Activity },

@@ -256,6 +256,36 @@ export async function createGreenhouse(data: {
   return json.location
 }
 
+export async function createFlowerShop(data: {
+  user_id: string
+  name: string
+  address: string
+}): Promise<ApiLocation> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/locations`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      user_id: data.user_id,
+      name: data.name,
+      type: "flower_shop",
+      address: data.address,
+    }),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("User not found")
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to create flower shop")
+  }
+  const json = await res.json()
+  return json.location
+}
+
 /** Raw user from backend API */
 export interface ApiUser {
   _id: string
