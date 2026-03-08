@@ -48,7 +48,7 @@ export function AddUserModal({ open, onClose, onSuccess }: AddUserModalProps) {
       return
     }
     if (!form.location_name.trim() || !form.location_address.trim()) {
-      setError("Location name and address are required")
+      setError("Company name and address are required")
       return
     }
     setSubmitting(true)
@@ -127,7 +127,7 @@ export function AddUserModal({ open, onClose, onSuccess }: AddUserModalProps) {
           <p className="text-sm font-medium mb-3">Initial Location</p>
           <div className="space-y-3">
             <div>
-              <Label>Location Name</Label>
+              <Label>Company Name</Label>
               <Input
                 value={form.location_name}
                 onChange={(e) => setForm((p) => ({ ...p, location_name: e.target.value }))}

@@ -339,7 +339,7 @@ export function UserReviewModal({
                       className="rounded-lg border p-4 space-y-3"
                     >
                       <div>
-                        <Label>Location Name</Label>
+                        <Label>Company Name</Label>
                         <Input
                           value={editLocations[loc._id]?.name ?? ""}
                           onChange={(e) =>
