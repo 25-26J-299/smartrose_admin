@@ -15,6 +15,7 @@ export interface User {
   is_active: boolean
   subscription_tier: "basic" | "pro" | "enterprise"
   greenhouse_count: number
+  flower_shop_count: number
   created_at: string
   last_login?: string
 }
