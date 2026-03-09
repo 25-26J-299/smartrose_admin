@@ -300,6 +300,7 @@ export interface ApiUser {
   last_login?: string
   is_active: boolean
   greenhouse_count?: number
+  flower_shop_count?: number
 }
 
 export async function searchApprovedUsers(query: string): Promise<SearchResult[]> {

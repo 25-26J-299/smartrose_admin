@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/Input"
 import { fetchUsers, type ApiUser } from "@/lib/api"
 import { formatDate } from "@/lib/utils"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table"
-import { UserCheck, UserX, Warehouse, Loader2, AlertCircle, FileSearch } from "lucide-react"
+import { UserCheck, UserX, Warehouse, Store, Loader2, AlertCircle, FileSearch } from "lucide-react"
 import { UserReviewModal } from "@/components/UserReviewModal"
 import { AddUserModal } from "@/components/AddUserModal"
 import type { User, UserStatus } from "@/types"
@@ -26,6 +26,7 @@ function mapApiUserToUser(api: ApiUser): User {
     is_active: api.is_active ?? true,
     subscription_tier: "basic",
     greenhouse_count: api.greenhouse_count ?? 0,
+    flower_shop_count: api.flower_shop_count ?? 0,
     created_at: created,
     last_login: lastLogin,
   }
@@ -170,7 +171,7 @@ export default function UsersPage({ statusFilter = "approved" }: UsersPageProps)
             <p className="text-sm font-semibold">{isPendingPage ? "Pending Users" : "Approved Users"}</p>
             {!isPendingPage && (
               <Button size="sm" className="h-8 text-xs" onClick={() => setInviteOpen(true)}>
-                + Invite User
+                + Add User
               </Button>
             )}
           </div>
@@ -227,6 +228,7 @@ export default function UsersPage({ statusFilter = "approved" }: UsersPageProps)
                   <TableHead className="text-xs">User</TableHead>
                   <TableHead className="text-xs">Role</TableHead>
                   <TableHead className="text-xs">Greenhouses</TableHead>
+                  <TableHead className="text-xs">Flower Shops</TableHead>
                   {!isPendingPage && <TableHead className="text-xs">Status</TableHead>}
                   <TableHead className="text-xs">Approval</TableHead>
                   <TableHead className="text-xs">Joined</TableHead>
@@ -261,6 +263,12 @@ export default function UsersPage({ statusFilter = "approved" }: UsersPageProps)
                       <div className="flex items-center gap-1.5 text-sm">
                         <Warehouse className="w-3.5 h-3.5 text-muted-foreground" />
                         <span>{user.greenhouse_count}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5 text-sm">
+                        <Store className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span>{user.flower_shop_count}</span>
                       </div>
                     </TableCell>
                     {!isPendingPage && (
@@ -305,7 +313,7 @@ export default function UsersPage({ statusFilter = "approved" }: UsersPageProps)
                 ))}
                 {filteredUsers.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={isPendingPage ? 6 : 8} className="text-center text-sm text-muted-foreground py-8">
+                    <TableCell colSpan={isPendingPage ? 7 : 9} className="text-center text-sm text-muted-foreground py-8">
                       No users match the current search/filter.
                     </TableCell>
                   </TableRow>
