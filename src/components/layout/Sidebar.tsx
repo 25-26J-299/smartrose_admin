@@ -8,7 +8,6 @@ import {
   Cpu,
   BarChart3,
   Activity,
-  ScrollText,
   LogOut,
   Flower2,
   Store,
@@ -27,7 +26,6 @@ const navItems = [
   { href: "/devices", label: "Devices", icon: Cpu },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/system", label: "System Health", icon: Activity },
-  { href: "/audit-logs", label: "Audit Logs", icon: ScrollText },
 ]
 
 export default function Sidebar() {

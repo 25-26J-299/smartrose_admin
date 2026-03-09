@@ -8,7 +8,6 @@ import FlowerShopsPage from './pages/FlowerShopsPage'
 import DevicesPage from './pages/DevicesPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import SystemPage from './pages/SystemPage'
-import AuditLogsPage from './pages/AuditLogsPage'
 
 export default function App() {
   return (
@@ -24,7 +23,6 @@ export default function App() {
         <Route path="devices" element={<DevicesPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="system" element={<SystemPage />} />
-        <Route path="audit-logs" element={<AuditLogsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/overview" replace />} />
     </Routes>

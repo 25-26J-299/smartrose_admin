@@ -4,6 +4,7 @@
  */
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1"
+const API_ROOT = API_BASE.replace(/\/api\/v1\/?$/, "")
 
 const AUTH_KEY = "smartrose_admin_token"
 
@@ -38,6 +39,18 @@ export async function login(
   const data = await res.json()
   setToken(data.access_token)
   return { token: data.access_token, user: data.user }
+}
+
+export async function fetchApiHealth(): Promise<{ status: string; message?: string }> {
+  const res = await fetch(`${API_ROOT}/health`)
+  if (!res.ok) throw new Error("Failed to fetch API health")
+  return res.json()
+}
+
+export async function fetchDbHealth(): Promise<{ status: string }> {
+  const res = await fetch(`${API_BASE}/db-health/`)
+  if (!res.ok) throw new Error("Failed to fetch database health")
+  return res.json()
 }
 
 export async function inviteUser(data: {
