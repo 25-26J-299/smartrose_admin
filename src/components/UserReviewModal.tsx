@@ -5,6 +5,7 @@ import {
   updateLocation,
   updateUserStatus,
   deleteUser,
+  changeUserPassword,
   type ApiUser,
   type ApiLocation,
 } from "@/lib/api"
@@ -14,7 +15,7 @@ import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
 import { Label } from "@/components/ui/Label"
 import { Badge } from "@/components/ui/Badge"
-import { UserCheck, UserX, Loader2, Edit2, Save, X, Trash2 } from "lucide-react"
+import { UserCheck, UserX, Loader2, Edit2, Save, X, Trash2, KeyRound } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface UserReviewModalProps {
@@ -62,6 +63,14 @@ export function UserReviewModal({
   const [editLocations, setEditLocations] = useState<
     Record<string, { name: string; type: string; address: string }>
   >({})
+
+  // Change-password state
+  const [showPasswordSection, setShowPasswordSection] = useState(false)
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordSuccess, setPasswordSuccess] = useState(false)
+  const [passwordActioning, setPasswordActioning] = useState(false)
 
   const loadData = async () => {
     if (!userId || !open) return
@@ -200,6 +209,32 @@ export function UserReviewModal({
       setError(e instanceof Error ? e.message : "Failed to delete user")
     } finally {
       setActioning(false)
+    }
+  }
+
+  const handleChangePassword = async () => {
+    setPasswordError(null)
+    setPasswordSuccess(false)
+    if (newPassword.length < 6) {
+      setPasswordError("Password must be at least 6 characters.")
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError("Passwords do not match.")
+      return
+    }
+    if (!user) return
+    setPasswordActioning(true)
+    try {
+      await changeUserPassword(user._id, newPassword)
+      setPasswordSuccess(true)
+      setNewPassword("")
+      setConfirmPassword("")
+      setTimeout(() => setShowPasswordSection(false), 1500)
+    } catch (e) {
+      setPasswordError(e instanceof Error ? e.message : "Failed to change password")
+    } finally {
+      setPasswordActioning(false)
     }
   }
 
@@ -452,6 +487,61 @@ export function UserReviewModal({
             )}
           </div>
 
+          {/* Change Password */}
+          {showPasswordSection && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
+              <h3 className="text-sm font-semibold text-amber-800 flex items-center gap-2">
+                <KeyRound className="h-4 w-4" />
+                Set New Password
+              </h3>
+              <div>
+                <Label>New Password</Label>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => { setNewPassword(e.target.value); setPasswordError(null); setPasswordSuccess(false) }}
+                  placeholder="Min. 6 characters"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label>Confirm Password</Label>
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => { setConfirmPassword(e.target.value); setPasswordError(null); setPasswordSuccess(false) }}
+                  placeholder="Repeat new password"
+                  className="mt-1"
+                />
+              </div>
+              {passwordError && (
+                <p className="text-xs text-red-600">{passwordError}</p>
+              )}
+              {passwordSuccess && (
+                <p className="text-xs text-green-700 font-medium">Password changed successfully.</p>
+              )}
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleChangePassword}
+                  disabled={passwordActioning}
+                  className="gap-2 bg-amber-600 hover:bg-amber-700"
+                >
+                  {passwordActioning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Save Password
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => { setShowPasswordSection(false); setNewPassword(""); setConfirmPassword(""); setPasswordError(null); setPasswordSuccess(false) }}
+                  disabled={passwordActioning}
+                  className="gap-2"
+                >
+                  <X className="h-4 w-4" />
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex flex-wrap gap-2 pt-4 border-t">
             {editMode ? (
@@ -488,6 +578,15 @@ export function UserReviewModal({
                 >
                   <Edit2 className="h-4 w-4" />
                   Edit
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => { setShowPasswordSection((v) => !v); setPasswordError(null); setPasswordSuccess(false) }}
+                  disabled={actioning}
+                  className="gap-2"
+                >
+                  <KeyRound className="h-4 w-4" />
+                  {showPasswordSection ? "Hide Password" : "Change Password"}
                 </Button>
                 {showDeleteAction && (
                   <Button

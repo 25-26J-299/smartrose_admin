@@ -190,6 +190,28 @@ export async function deleteUser(userId: string): Promise<void> {
   }
 }
 
+export async function changeUserPassword(
+  userId: string,
+  newPassword: string
+): Promise<void> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/users/${userId}/password`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ new_password: newPassword }),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("User not found")
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to change password")
+  }
+}
+
 export async function updateLocation(
   locationId: string,
   data: { name?: string; type?: string; address?: string; is_active?: boolean }
