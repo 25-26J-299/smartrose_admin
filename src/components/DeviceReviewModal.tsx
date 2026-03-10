@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
 import { Label } from "@/components/ui/Label"
 import { Badge } from "@/components/ui/Badge"
-import { deleteDevice, updateDevice, type ApiDevice } from "@/lib/api"
+import { deleteDevice, updateDevice, fetchBaseStations, type ApiDevice, type ApiBaseStation } from "@/lib/api"
 import { Loader2, Edit2, Save, Trash2, X } from "lucide-react"
 
 interface DeviceReviewModalProps {
@@ -41,7 +41,10 @@ export function DeviceReviewModal({
     name: "",
     type: "INM",
     device_serial_number: "",
+    base_station_id: null as string | null,
   })
+  const [baseStations, setBaseStations] = useState<ApiBaseStation[]>([])
+  const [loadingBaseStations, setLoadingBaseStations] = useState(false)
 
   useEffect(() => {
     if (!device || !open) return
@@ -51,7 +54,17 @@ export function DeviceReviewModal({
       name: device.name ?? "",
       type: device.type ?? "INM",
       device_serial_number: device.device_serial_number ?? "",
+      base_station_id: device.base_station_id ?? null,
     })
+    if (device.user_id) {
+      setLoadingBaseStations(true)
+      fetchBaseStations({ user_id: device.user_id })
+        .then(setBaseStations)
+        .catch(() => setBaseStations([]))
+        .finally(() => setLoadingBaseStations(false))
+    } else {
+      setBaseStations([])
+    }
   }, [device, open])
 
   if (!open || !device) return null
@@ -64,6 +77,7 @@ export function DeviceReviewModal({
         name: form.name || undefined,
         type: form.type || undefined,
         device_serial_number: form.device_serial_number || undefined,
+        base_station_id: form.base_station_id === "" ? null : form.base_station_id ?? null,
       })
       setEditMode(false)
       onSuccess()
@@ -99,6 +113,7 @@ export function DeviceReviewModal({
       name: device.name ?? "",
       type: device.type ?? "INM",
       device_serial_number: device.device_serial_number ?? "",
+      base_station_id: device.base_station_id ?? null,
     })
   }
 
@@ -141,6 +156,29 @@ export function DeviceReviewModal({
                   className="mt-1"
                 />
               </div>
+              <div>
+                <Label className="text-muted-foreground">Base station (optional)</Label>
+                <select
+                  value={form.base_station_id ?? ""}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      base_station_id: e.target.value === "" ? null : e.target.value,
+                    }))
+                  }
+                  className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">None</option>
+                  {baseStations.map((bs) => (
+                    <option key={bs._id} value={bs._id}>
+                      {bs.name} ({bs.serial})
+                    </option>
+                  ))}
+                </select>
+                {loadingBaseStations && (
+                  <p className="text-xs text-muted-foreground mt-1">Loading base stations...</p>
+                )}
+              </div>
             </div>
           ) : (
             <div className="rounded-lg border p-4 space-y-2 text-sm">
@@ -165,6 +203,10 @@ export function DeviceReviewModal({
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Owner</span>
                 <span>{device.user_name || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Base station</span>
+                <span>{device.base_station_serial ?? "—"}</span>
               </div>
             </div>
           )}

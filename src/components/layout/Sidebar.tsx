@@ -13,6 +13,7 @@ import {
   Store,
   ChevronLeft,
   ChevronRight,
+  Radio,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useState } from "react"
@@ -24,6 +25,7 @@ const navItems = [
   { href: "/greenhouses", label: "Greenhouses", icon: Warehouse },
   { href: "/flower-shops", label: "Flower Shops", icon: Store },
   { href: "/devices", label: "Devices", icon: Cpu },
+  { href: "/base-stations", label: "Base Stations", icon: Radio },
   { href: "/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/system", label: "System Health", icon: Activity },
 ]

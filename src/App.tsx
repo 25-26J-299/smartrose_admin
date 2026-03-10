@@ -6,6 +6,7 @@ import UsersPage from './pages/UsersPage'
 import GreenhousesPage from './pages/GreenhousesPage'
 import FlowerShopsPage from './pages/FlowerShopsPage'
 import DevicesPage from './pages/DevicesPage'
+import BaseStationsPage from './pages/BaseStationsPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import SystemPage from './pages/SystemPage'
 
@@ -21,6 +22,7 @@ export default function App() {
         <Route path="greenhouses" element={<GreenhousesPage />} />
         <Route path="flower-shops" element={<FlowerShopsPage />} />
         <Route path="devices" element={<DevicesPage />} />
+        <Route path="base-stations" element={<BaseStationsPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="system" element={<SystemPage />} />
       </Route>

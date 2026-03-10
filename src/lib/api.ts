@@ -227,6 +227,95 @@ export async function deleteLocation(locationId: string): Promise<void> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Base stations (admin) — EOSM
+// ---------------------------------------------------------------------------
+
+export interface ApiBaseStation {
+  _id: string
+  user_id: string
+  name: string
+  serial: string
+  last_seen?: string | null
+  created_at?: string
+  updated_at?: string
+  user_name?: string
+}
+
+export async function fetchBaseStations(params?: { user_id?: string }): Promise<ApiBaseStation[]> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const q = new URLSearchParams()
+  if (params?.user_id) q.set("user_id", params.user_id)
+  const url = q.toString() ? `${API_BASE}/admin/base-stations?${q}` : `${API_BASE}/admin/base-stations`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) throw new Error("Failed to fetch base stations")
+  const data = await res.json()
+  return data.base_stations ?? []
+}
+
+export async function createBaseStation(data: {
+  user_id: string
+  name: string
+  serial: string
+}): Promise<ApiBaseStation> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/base-stations`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to create base station")
+  }
+  const json = await res.json()
+  return json.base_station
+}
+
+export async function updateBaseStation(
+  baseStationId: string,
+  data: { name?: string; serial?: string }
+): Promise<ApiBaseStation> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/base-stations/${baseStationId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to update base station")
+  }
+  const json = await res.json()
+  return json.base_station
+}
+
+export async function deleteBaseStation(baseStationId: string): Promise<void> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/base-stations/${baseStationId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to delete base station")
+  }
+}
+
 export async function fetchLocations(): Promise<ApiLocation[]> {
   const token = getToken()
   if (!token) handleUnauthorized()
@@ -331,19 +420,30 @@ export async function searchApprovedUsers(query: string): Promise<SearchResult[]
 export async function createDevice(data: {
   location_id: string
   user_id: string
+  base_station_id?: string | null
   name: string
   type: string
   device_serial_number: string
 }): Promise<ApiDevice> {
   const token = getToken()
   if (!token) handleUnauthorized()
+  const body: Record<string, unknown> = {
+    location_id: data.location_id,
+    user_id: data.user_id,
+    name: data.name,
+    type: data.type,
+    device_serial_number: data.device_serial_number,
+  }
+  if (data.base_station_id != null && data.base_station_id !== "") {
+    body.base_station_id = data.base_station_id
+  }
   const res = await fetch(`${API_BASE}/admin/devices`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify(body),
   })
   if (res.status === 401) handleUnauthorized()
   if (!res.ok) {
@@ -371,17 +471,22 @@ export async function fetchDevices(params?: {
 
 export async function updateDevice(
   deviceId: string,
-  data: { name?: string; type?: string; device_serial_number?: string }
+  data: { name?: string; type?: string; device_serial_number?: string; base_station_id?: string | null }
 ): Promise<ApiDevice> {
   const token = getToken()
   if (!token) handleUnauthorized()
+  const body: Record<string, unknown> = {}
+  if (data.name !== undefined) body.name = data.name
+  if (data.type !== undefined) body.type = data.type
+  if (data.device_serial_number !== undefined) body.device_serial_number = data.device_serial_number
+  if (data.base_station_id !== undefined) body.base_station_id = data.base_station_id === "" ? null : data.base_station_id
   const res = await fetch(`${API_BASE}/admin/devices/${deviceId}`, {
     method: "PATCH",
     headers: {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(data),
+    body: JSON.stringify(body),
   })
   if (res.status === 401) handleUnauthorized()
   if (res.status === 404) throw new Error("Device not found")
@@ -440,11 +545,13 @@ export interface ApiDevice {
   _id: string
   location_id: string
   user_id: string
+  base_station_id?: string | null
   name: string
   type: string
   device_serial_number: string
   location_name?: string
   user_name?: string
+  base_station_serial?: string
   last_seen?: string
   created_at?: string
   updated_at?: string

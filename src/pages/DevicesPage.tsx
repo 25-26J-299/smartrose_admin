@@ -184,6 +184,7 @@ export default function DevicesPage() {
                   <TableHead className="text-xs">Type</TableHead>
                   <TableHead className="text-xs">Location</TableHead>
                   <TableHead className="text-xs">Owner</TableHead>
+                  <TableHead className="text-xs">Base station</TableHead>
                   <TableHead className="text-xs">Serial</TableHead>
                   <TableHead className="text-xs w-32">Actions</TableHead>
                 </TableRow>
@@ -204,6 +205,9 @@ export default function DevicesPage() {
                       </TableCell>
                       <TableCell className="text-sm">{locName || "—"}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{userName || "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {device.base_station_serial ?? "—"}
+                      </TableCell>
                       <TableCell className="text-xs font-mono">{device.device_serial_number}</TableCell>
                       <TableCell>
                         <Button
@@ -222,7 +226,7 @@ export default function DevicesPage() {
                 })}
                 {filteredDevices.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-sm text-muted-foreground py-8">
+                    <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
                       No devices match the current search/filter.
                     </TableCell>
                   </TableRow>

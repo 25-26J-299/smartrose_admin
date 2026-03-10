@@ -2,8 +2,10 @@ import { useState, useEffect, useCallback } from "react"
 import {
   searchApprovedUsers,
   createDevice,
+  fetchBaseStations,
   type SearchResult,
   type ApiLocation,
+  type ApiBaseStation,
 } from "@/lib/api"
 import { Dialog } from "@/components/ui/Dialog"
 import { Button } from "@/components/ui/Button"
@@ -39,6 +41,9 @@ export function AddDeviceModal({
   const [name, setName] = useState("")
   const [type, setType] = useState("INM")
   const [deviceSerialNumber, setDeviceSerialNumber] = useState("")
+  const [baseStationId, setBaseStationId] = useState<string | null>(null)
+  const [baseStations, setBaseStations] = useState<ApiBaseStation[]>([])
+  const [loadingBaseStations, setLoadingBaseStations] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -72,6 +77,15 @@ export function AddDeviceModal({
 
   const handleSelectLocation = (item: SearchResult, loc: ApiLocation) => {
     setSelectedLocation({ location: loc, user: item.user })
+    setBaseStationId(null)
+    setBaseStations([])
+    if (item.user._id) {
+      setLoadingBaseStations(true)
+      fetchBaseStations({ user_id: item.user._id })
+        .then(setBaseStations)
+        .catch(() => setBaseStations([]))
+        .finally(() => setLoadingBaseStations(false))
+    }
   }
 
   const handleSubmit = async () => {
@@ -96,6 +110,7 @@ export function AddDeviceModal({
         name: name.trim(),
         type,
         device_serial_number: deviceSerialNumber.trim(),
+        base_station_id: baseStationId && baseStationId !== "" ? baseStationId : undefined,
       })
       onSuccess()
       handleClose()
@@ -113,6 +128,8 @@ export function AddDeviceModal({
     setName("")
     setType("INM")
     setDeviceSerialNumber("")
+    setBaseStationId(null)
+    setBaseStations([])
     setError(null)
     onClose()
   }
@@ -218,6 +235,24 @@ export function AddDeviceModal({
               onChange={(e) => setDeviceSerialNumber(e.target.value)}
               className="mt-1"
             />
+          </div>
+          <div>
+            <Label className="text-muted-foreground">Base station (optional)</Label>
+            <select
+              value={baseStationId ?? ""}
+              onChange={(e) => setBaseStationId(e.target.value === "" ? null : e.target.value)}
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            >
+              <option value="">None</option>
+              {baseStations.map((bs) => (
+                <option key={bs._id} value={bs._id}>
+                  {bs.name} ({bs.serial})
+                </option>
+              ))}
+            </select>
+            {loadingBaseStations && (
+              <p className="text-xs text-muted-foreground mt-1">Loading base stations...</p>
+            )}
           </div>
         </div>
       )}
