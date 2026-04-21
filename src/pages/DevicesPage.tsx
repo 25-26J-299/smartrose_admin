@@ -1,70 +1,121 @@
+import { useEffect, useState } from "react"
 import TopBar from "@/components/layout/TopBar"
 import { Card } from "@/components/ui/Card"
 import { Badge } from "@/components/ui/Badge"
 import { Button } from "@/components/ui/Button"
-import { mockDevices } from "@/lib/mock-data"
-import { timeAgo } from "@/lib/utils"
+import { Input } from "@/components/ui/Input"
+import {
+  fetchDevices,
+  type ApiDevice,
+} from "@/lib/api"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table"
-import { MoreHorizontal, Wifi, WifiOff, AlertTriangle } from "lucide-react"
-import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/DropdownMenu"
-import type { DeviceType } from "@/types"
+import { Loader2, AlertCircle, Plus, FileSearch } from "lucide-react"
+import { AddDeviceModal } from "@/components/AddDeviceModal"
+import { DeviceReviewModal } from "@/components/DeviceReviewModal"
 
-const deviceTypeColor: Record<DeviceType, string> = {
+const deviceTypeColor: Record<string, string> = {
   INM: "bg-green-100 text-green-700",
   EOSM: "bg-blue-100 text-blue-700",
   EDAS: "bg-purple-100 text-purple-700",
   FM: "bg-amber-100 text-amber-700",
 }
 
-const deviceTypeDesc: Record<DeviceType, string> = {
+const deviceTypeDesc: Record<string, string> = {
   INM: "Nutrient Management",
   EOSM: "Stress Monitoring",
   EDAS: "Disease Alerting",
   FM: "Freshness Monitoring",
 }
 
-const StatusIcon = ({ status }: { status: string }) => {
-  if (status === "online") return <Wifi className="w-3.5 h-3.5 text-green-600" />
-  if (status === "warning") return <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-  return <WifiOff className="w-3.5 h-3.5 text-red-500" />
-}
-
-const statusBadgeClass = (status: string) => {
-  if (status === "online") return "bg-green-100 text-green-700"
-  if (status === "warning") return "bg-amber-100 text-amber-700"
-  return "bg-red-100 text-red-700"
-}
-
 export default function DevicesPage() {
-  const online = mockDevices.filter((d) => d.status === "online").length
-  const offline = mockDevices.filter((d) => d.status === "offline").length
-  const warning = mockDevices.filter((d) => d.status === "warning").length
+  const [devices, setDevices] = useState<ApiDevice[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [addModalOpen, setAddModalOpen] = useState(false)
+  const [reviewDevice, setReviewDevice] = useState<ApiDevice | null>(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [typeFilter, setTypeFilter] = useState("all")
+
+  const refreshDevices = () => {
+    fetchDevices()
+      .then(setDevices)
+      .catch(() => setError("Failed to refresh"))
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    fetchDevices()
+      .then((d) => {
+        if (!cancelled) setDevices(d)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load")
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [])
+
   const byType = (["INM", "EOSM", "EDAS", "FM"] as const).map((t) => ({
     type: t,
-    count: mockDevices.filter((d) => d.type === t).length,
+    count: devices.filter((d) => d.type === t).length,
   }))
+  const filteredDevices = devices.filter((device) => {
+    const q = searchQuery.trim().toLowerCase()
+    const matchesSearch =
+      q.length === 0 ||
+      device.name.toLowerCase().includes(q) ||
+      device.device_serial_number.toLowerCase().includes(q) ||
+      (device.location_name ?? "").toLowerCase().includes(q) ||
+      (device.user_name ?? "").toLowerCase().includes(q) ||
+      device.type.toLowerCase().includes(q)
+    const matchesType = typeFilter === "all" || device.type === typeFilter
+    return matchesSearch && matchesType
+  })
+
+  if (loading) {
+    return (
+      <div className="flex flex-col h-full overflow-hidden">
+        <TopBar title="Devices" subtitle="All IoT devices registered across locations." />
+        <div className="flex-1 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    const isSessionExpired =
+      error.toLowerCase().includes("session expired") ||
+      error.toLowerCase().includes("not authenticated")
+    return (
+      <div className="flex flex-col h-full overflow-hidden">
+        <TopBar title="Devices" subtitle="All IoT devices registered across locations." />
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 p-6">
+          <AlertCircle className="w-10 h-10 text-red-500" />
+          <p className="text-sm text-muted-foreground text-center">{error}</p>
+          {isSessionExpired ? (
+            <Button onClick={() => { window.location.href = "/login" }}>Sign in again</Button>
+          ) : (
+            <Button onClick={refreshDevices}>Retry</Button>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <TopBar title="Devices" subtitle="All IoT devices registered across greenhouses." />
+      <TopBar title="Devices" subtitle="All IoT devices registered across locations." />
 
       <div className="flex-1 overflow-y-auto p-6 space-y-5">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <Card className="p-4 border shadow-none">
             <p className="text-xs text-muted-foreground font-medium">Total Devices</p>
-            <p className="text-2xl font-bold mt-1">{mockDevices.length}</p>
-          </Card>
-          <Card className="p-4 border shadow-none">
-            <p className="text-xs text-muted-foreground font-medium">Online</p>
-            <p className="text-2xl font-bold mt-1 text-green-600">{online}</p>
-          </Card>
-          <Card className="p-4 border shadow-none">
-            <p className="text-xs text-muted-foreground font-medium">Warning</p>
-            <p className="text-2xl font-bold mt-1 text-amber-500">{warning}</p>
-          </Card>
-          <Card className="p-4 border shadow-none">
-            <p className="text-xs text-muted-foreground font-medium">Offline</p>
-            <p className="text-2xl font-bold mt-1 text-red-500">{offline}</p>
+            <p className="text-2xl font-bold mt-1">{devices.length}</p>
           </Card>
         </div>
 
@@ -83,7 +134,47 @@ export default function DevicesPage() {
         <Card className="border shadow-none overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
             <p className="text-sm font-semibold">Device Registry</p>
-            <Button size="sm" className="h-8 text-xs">+ Register Device</Button>
+            <Button
+              size="sm"
+              className="h-8 text-xs"
+              onClick={() => setAddModalOpen(true)}
+            >
+              <Plus className="w-3.5 h-3.5 mr-1" />
+              Add Device
+            </Button>
+          </div>
+          <div className="px-5 py-4 border-b border-border flex flex-col md:flex-row gap-3 md:items-center">
+            <Input
+              placeholder="Search by device, serial, location, or owner..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="md:max-w-sm"
+            />
+            <select
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm md:w-44"
+            >
+              <option value="all">All Types</option>
+              <option value="INM">INM</option>
+              <option value="EOSM">EOSM</option>
+              <option value="EDAS">EDAS</option>
+              <option value="FM">FM</option>
+            </select>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={() => {
+                setSearchQuery("")
+                setTypeFilter("all")
+              }}
+            >
+              Clear
+            </Button>
+            <p className="text-xs text-muted-foreground md:ml-auto">
+              Showing {filteredDevices.length} of {devices.length}
+            </p>
           </div>
           <div className="overflow-x-auto">
             <Table>
@@ -91,55 +182,77 @@ export default function DevicesPage() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-xs">Device</TableHead>
                   <TableHead className="text-xs">Type</TableHead>
-                  <TableHead className="text-xs">Greenhouse</TableHead>
+                  <TableHead className="text-xs">Location</TableHead>
                   <TableHead className="text-xs">Owner</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
-                  <TableHead className="text-xs">Last Seen</TableHead>
-                  <TableHead className="text-xs">Frequency</TableHead>
-                  <TableHead className="text-xs">Firmware</TableHead>
-                  <TableHead className="text-xs w-10"></TableHead>
+                  <TableHead className="text-xs">Base station</TableHead>
+                  <TableHead className="text-xs">Serial</TableHead>
+                  <TableHead className="text-xs w-32">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mockDevices.map((device) => (
-                  <TableRow key={device.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full shrink-0 ${device.status === "online" ? "bg-green-500" : device.status === "warning" ? "bg-amber-500" : "bg-red-500"}`} />
+                {filteredDevices.map((device) => {
+                  const locName = device.location_name ?? ""
+                  const userName = device.user_name ?? ""
+                  return (
+                    <TableRow key={device._id}>
+                      <TableCell>
                         <p className="text-sm font-medium">{device.name}</p>
-                      </div>
-                      <p className="text-xs text-muted-foreground ml-4">{device.id}</p>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={`${deviceTypeColor[device.type]} border-0 text-xs`}>{device.type}</Badge>
-                    </TableCell>
-                    <TableCell className="text-sm">{device.greenhouse_name}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{device.owner_name}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1.5">
-                        <StatusIcon status={device.status} />
-                        <Badge className={`${statusBadgeClass(device.status)} border-0 text-xs`}>{device.status}</Badge>
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{device.last_seen ? timeAgo(device.last_seen) : "—"}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{device.data_frequency_min ? `${device.data_frequency_min} min` : "—"}</TableCell>
-                    <TableCell className="text-xs font-mono text-muted-foreground">{device.firmware_version ?? "—"}</TableCell>
-                    <TableCell>
-                      <DropdownMenu trigger={<Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="w-4 h-4" /></Button>}>
-                        <DropdownMenuItem>View Details</DropdownMenuItem>
-                        <DropdownMenuItem>View Greenhouse</DropdownMenuItem>
-                        <DropdownMenuItem>Regenerate API Key</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-500">Revoke & Remove</DropdownMenuItem>
-                      </DropdownMenu>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={`${deviceTypeColor[device.type]} border-0 text-xs`}>
+                          {device.type}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-sm">{locName || "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{userName || "—"}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {device.base_station_serial ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-xs font-mono">{device.device_serial_number}</TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5 px-3"
+                          onClick={() => setReviewDevice(device)}
+                          title="Review"
+                        >
+                          <FileSearch className="w-4 h-4" />
+                          Review
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+                {filteredDevices.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center text-sm text-muted-foreground py-8">
+                      No devices match the current search/filter.
                     </TableCell>
                   </TableRow>
-                ))}
+                )}
               </TableBody>
             </Table>
           </div>
+          {devices.length === 0 && (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              No devices registered. Click &quot;Add Device&quot; to register one.
+            </div>
+          )}
         </Card>
       </div>
+
+      <AddDeviceModal
+        open={addModalOpen}
+        onClose={() => setAddModalOpen(false)}
+        onSuccess={refreshDevices}
+      />
+      <DeviceReviewModal
+        device={reviewDevice}
+        open={reviewDevice !== null}
+        onClose={() => setReviewDevice(null)}
+        onSuccess={refreshDevices}
+      />
     </div>
   )
 }

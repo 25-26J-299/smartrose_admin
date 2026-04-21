@@ -4,10 +4,11 @@ import LoginPage from './pages/LoginPage'
 import OverviewPage from './pages/OverviewPage'
 import UsersPage from './pages/UsersPage'
 import GreenhousesPage from './pages/GreenhousesPage'
+import FlowerShopsPage from './pages/FlowerShopsPage'
 import DevicesPage from './pages/DevicesPage'
+import BaseStationsPage from './pages/BaseStationsPage'
 import AnalyticsPage from './pages/AnalyticsPage'
 import SystemPage from './pages/SystemPage'
-import AuditLogsPage from './pages/AuditLogsPage'
 
 export default function App() {
   return (
@@ -16,12 +17,14 @@ export default function App() {
       <Route path="/" element={<DashboardLayout />}>
         <Route index element={<Navigate to="/overview" replace />} />
         <Route path="overview" element={<OverviewPage />} />
-        <Route path="users" element={<UsersPage />} />
+        <Route path="users" element={<UsersPage statusFilter="approved" />} />
+        <Route path="pending-users" element={<UsersPage statusFilter="pending" />} />
         <Route path="greenhouses" element={<GreenhousesPage />} />
+        <Route path="flower-shops" element={<FlowerShopsPage />} />
         <Route path="devices" element={<DevicesPage />} />
+        <Route path="base-stations" element={<BaseStationsPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="system" element={<SystemPage />} />
-        <Route path="audit-logs" element={<AuditLogsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/overview" replace />} />
     </Routes>

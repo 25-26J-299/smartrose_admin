@@ -3,25 +3,30 @@ import TopBar from "@/components/layout/TopBar"
 import { Card } from "@/components/ui/Card"
 import { Badge } from "@/components/ui/Badge"
 import { Button } from "@/components/ui/Button"
-import { fetchUsers, updateUserRole, updateUserStatus, type ApiUser } from "@/lib/api"
+import { Input } from "@/components/ui/Input"
+import { fetchUsers, type ApiUser } from "@/lib/api"
 import { formatDate } from "@/lib/utils"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/Table"
-import { UserCheck, UserX, Warehouse, MoreHorizontal, Loader2, AlertCircle } from "lucide-react"
-import { DropdownMenu, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/DropdownMenu"
+import { UserCheck, UserX, Warehouse, Store, Loader2, AlertCircle, FileSearch } from "lucide-react"
+import { UserReviewModal } from "@/components/UserReviewModal"
+import { AddUserModal } from "@/components/AddUserModal"
 import type { User, UserStatus } from "@/types"
 
 function mapApiUserToUser(api: ApiUser): User {
   const created = typeof api.created_at === "string" ? api.created_at : (api.created_at as { $date?: string })?.$date ?? ""
   const lastLogin = api.last_login ? (typeof api.last_login === "string" ? api.last_login : (api.last_login as { $date?: string })?.$date ?? "") : undefined
+  const allRoles = (api.roles?.length ? api.roles : [api.role ?? "farmer"]) as User["roles"]
   return {
     id: api._id,
     name: api.full_name ?? api.email,
     email: api.email,
     role: (api.role ?? "farmer") as User["role"],
+    roles: allRoles,
     status: (api.status ?? "pending") as UserStatus,
     is_active: api.is_active ?? true,
     subscription_tier: "basic",
-    greenhouse_count: 0,
+    greenhouse_count: api.greenhouse_count ?? 0,
+    flower_shop_count: api.flower_shop_count ?? 0,
     created_at: created,
     last_login: lastLogin,
   }
@@ -45,68 +50,32 @@ const statusBadge = (status: string) => {
   return map[status] ?? "bg-gray-100 text-gray-700"
 }
 
-const tierBadge = (tier: string) => {
-  const map: Record<string, string> = {
-    basic: "bg-gray-100 text-gray-600",
-    pro: "bg-blue-100 text-blue-700",
-    enterprise: "bg-amber-100 text-amber-700",
-  }
-  return map[tier] ?? "bg-gray-100 text-gray-700"
+interface UsersPageProps {
+  statusFilter?: "approved" | "pending"
 }
 
-export default function UsersPage() {
+export default function UsersPage({ statusFilter = "approved" }: UsersPageProps) {
   const [users, setUsers] = useState<User[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [reviewUserId, setReviewUserId] = useState<string | null>(null)
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [roleFilter, setRoleFilter] = useState("all")
+  const [accountFilter, setAccountFilter] = useState("all")
+  const isPendingPage = statusFilter === "pending"
 
   const refreshUsers = () => {
-    fetchUsers()
+    fetchUsers(statusFilter)
       .then((apiUsers) => setUsers(apiUsers.map(mapApiUserToUser)))
       .catch(() => setError("Failed to refresh"))
-  }
-
-  const handleApprove = async (userId: string) => {
-    setUpdatingId(userId)
-    try {
-      await updateUserStatus(userId, "approved")
-      refreshUsers()
-    } catch {
-      setError("Failed to approve user")
-    } finally {
-      setUpdatingId(null)
-    }
-  }
-
-  const handleReject = async (userId: string) => {
-    setUpdatingId(userId)
-    try {
-      await updateUserStatus(userId, "rejected")
-      refreshUsers()
-    } catch {
-      setError("Failed to reject user")
-    } finally {
-      setUpdatingId(null)
-    }
-  }
-
-  const handleChangeRole = async (userId: string, newRole: "farmer" | "florist" | "admin") => {
-    setUpdatingId(userId)
-    try {
-      await updateUserRole(userId, newRole)
-      refreshUsers()
-    } catch {
-      setError("Failed to update role")
-    } finally {
-      setUpdatingId(null)
-    }
   }
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
-    fetchUsers()
+    fetchUsers(statusFilter)
       .then((apiUsers) => {
         if (!cancelled) {
           setUsers(apiUsers.map(mapApiUserToUser))
@@ -121,10 +90,27 @@ export default function UsersPage() {
         if (!cancelled) setLoading(false)
       })
     return () => { cancelled = true }
-  }, [])
+  }, [statusFilter])
 
   const activeCount = users.filter((u) => u.is_active).length
   const inactiveCount = users.length - activeCount
+  const roleOptions = Array.from(new Set(users.flatMap((u) => u.roles ?? [u.role]))).sort()
+  const filteredUsers = users.filter((user) => {
+    const q = searchQuery.trim().toLowerCase()
+    const userRolesList = user.roles ?? [user.role]
+    const matchesSearch =
+      q.length === 0 ||
+      user.name.toLowerCase().includes(q) ||
+      user.email.toLowerCase().includes(q) ||
+      userRolesList.some((r) => r.toLowerCase().includes(q))
+    const matchesRole = roleFilter === "all" || userRolesList.includes(roleFilter as User["role"])
+    const matchesAccount =
+      isPendingPage ||
+      accountFilter === "all" ||
+      (accountFilter === "active" && user.is_active) ||
+      (accountFilter === "inactive" && !user.is_active)
+    return matchesSearch && matchesRole && matchesAccount
+  })
 
   if (loading) {
     return (
@@ -157,15 +143,21 @@ export default function UsersPage() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <TopBar title="Users" subtitle="Manage all registered users across the platform." />
+      <TopBar
+        title={isPendingPage ? "Pending Users" : "Users"}
+        subtitle={isPendingPage ? "Users awaiting approval." : "Approved users across the platform."}
+      />
 
       <div className="flex-1 overflow-y-auto p-6 space-y-5">
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className={`grid gap-4 ${isPendingPage ? "grid-cols-1" : "grid-cols-2 sm:grid-cols-3"}`}>
           {[
-            { label: "Total Users", value: users.length, color: "text-foreground" },
-            { label: "Active", value: activeCount, color: "text-green-600" },
-            { label: "Inactive", value: inactiveCount, color: "text-red-500" },
-            { label: "New This Month", value: "-", color: "text-blue-600" },
+            { label: isPendingPage ? "Total Pending Users" : "Total Users", value: users.length, color: "text-foreground" },
+            ...(!isPendingPage
+              ? [
+                  { label: "Active", value: activeCount, color: "text-green-600" },
+                  { label: "Inactive", value: inactiveCount, color: "text-red-500" },
+                ]
+              : []),
           ].map(({ label, value, color }) => (
             <Card key={label} className="p-4 border shadow-none">
               <p className="text-xs text-muted-foreground font-medium">{label}</p>
@@ -176,8 +168,58 @@ export default function UsersPage() {
 
         <Card className="border shadow-none overflow-hidden">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <p className="text-sm font-semibold">All Users</p>
-            <Button size="sm" className="h-8 text-xs">+ Invite User</Button>
+            <p className="text-sm font-semibold">{isPendingPage ? "Pending Users" : "Approved Users"}</p>
+            {!isPendingPage && (
+              <Button size="sm" className="h-8 text-xs" onClick={() => setInviteOpen(true)}>
+                + Add User
+              </Button>
+            )}
+          </div>
+          <div className="px-5 py-4 border-b border-border flex flex-col md:flex-row gap-3 md:items-center">
+            <Input
+              placeholder={isPendingPage ? "Search pending users..." : "Search users..."}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="md:max-w-xs"
+            />
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm md:w-44"
+            >
+              <option value="all">All Roles</option>
+              {roleOptions.map((role) => (
+                <option key={role} value={role}>
+                  {role[0].toUpperCase() + role.slice(1)}
+                </option>
+              ))}
+            </select>
+            {!isPendingPage && (
+              <select
+                value={accountFilter}
+                onChange={(e) => setAccountFilter(e.target.value)}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm md:w-44"
+              >
+                <option value="all">All Accounts</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9"
+              onClick={() => {
+                setSearchQuery("")
+                setRoleFilter("all")
+                setAccountFilter("all")
+              }}
+            >
+              Clear
+            </Button>
+            <p className="text-xs text-muted-foreground md:ml-auto">
+              Showing {filteredUsers.length} of {users.length}
+            </p>
           </div>
           <div className="overflow-x-auto">
             <Table>
@@ -185,17 +227,17 @@ export default function UsersPage() {
                 <TableRow className="hover:bg-transparent">
                   <TableHead className="text-xs">User</TableHead>
                   <TableHead className="text-xs">Role</TableHead>
-                  <TableHead className="text-xs">Plan</TableHead>
                   <TableHead className="text-xs">Greenhouses</TableHead>
-                  <TableHead className="text-xs">Status</TableHead>
+                  <TableHead className="text-xs">Flower Shops</TableHead>
+                  {!isPendingPage && <TableHead className="text-xs">Status</TableHead>}
                   <TableHead className="text-xs">Approval</TableHead>
                   <TableHead className="text-xs">Joined</TableHead>
-                  <TableHead className="text-xs">Last Login</TableHead>
-                  <TableHead className="text-xs w-10"></TableHead>
+                  {!isPendingPage && <TableHead className="text-xs">Last Login</TableHead>}
+                  <TableHead className="text-xs w-32">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((user) => (
+                {filteredUsers.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -211,10 +253,11 @@ export default function UsersPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={`${roleBadge(user.role)} border-0 text-xs capitalize`}>{user.role}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={`${tierBadge(user.subscription_tier)} border-0 text-xs capitalize`}>{user.subscription_tier}</Badge>
+                      <div className="flex gap-1 flex-wrap">
+                        {(user.roles ?? [user.role]).map((r) => (
+                          <Badge key={r} className={`${roleBadge(r)} border-0 text-xs capitalize`}>{r}</Badge>
+                        ))}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1.5 text-sm">
@@ -223,52 +266,80 @@ export default function UsersPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      {user.is_active ? (
-                        <div className="flex items-center gap-1.5 text-green-600 text-xs font-medium">
-                          <UserCheck className="w-3.5 h-3.5" />
-                          Active
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1.5 text-red-500 text-xs font-medium">
-                          <UserX className="w-3.5 h-3.5" />
-                          Inactive
-                        </div>
-                      )}
+                      <div className="flex items-center gap-1.5 text-sm">
+                        <Store className="w-3.5 h-3.5 text-muted-foreground" />
+                        <span>{user.flower_shop_count}</span>
+                      </div>
                     </TableCell>
+                    {!isPendingPage && (
+                      <TableCell>
+                        {user.is_active ? (
+                          <div className="flex items-center gap-1.5 text-green-600 text-xs font-medium">
+                            <UserCheck className="w-3.5 h-3.5" />
+                            Active
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 text-red-500 text-xs font-medium">
+                            <UserX className="w-3.5 h-3.5" />
+                            Inactive
+                          </div>
+                        )}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Badge className={`${statusBadge(user.status ?? "pending")} border-0 text-xs capitalize`}>
                         {user.status ?? "pending"}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground">{formatDate(user.created_at)}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{user.last_login ? formatDate(user.last_login) : "—"}</TableCell>
+                    {!isPendingPage && (
+                      <TableCell className="text-xs text-muted-foreground">
+                        {user.last_login ? formatDate(user.last_login) : "—"}
+                      </TableCell>
+                    )}
                     <TableCell>
-                      <DropdownMenu
-                        trigger={
-                          <Button variant="ghost" size="icon" className="h-7 w-7" disabled={updatingId === user.id}>
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        }
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1.5 px-3"
+                        onClick={() => setReviewUserId(user.id)}
+                        title="Review"
                       >
-                        {user.status === "pending" && (
-                          <>
-                            <DropdownMenuItem onClick={() => handleApprove(user.id)}>Approve</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleReject(user.id)} className="text-red-500">Reject</DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                          </>
-                        )}
-                        <DropdownMenuItem onClick={() => handleChangeRole(user.id, "farmer")}>Set Role: Farmer</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleChangeRole(user.id, "florist")}>Set Role: Florist</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleChangeRole(user.id, "admin")}>Set Role: Admin</DropdownMenuItem>
-                      </DropdownMenu>
+                        <FileSearch className="w-4 h-4" />
+                        Review
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
+                {filteredUsers.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={isPendingPage ? 7 : 9} className="text-center text-sm text-muted-foreground py-8">
+                      No users match the current search/filter.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </div>
         </Card>
       </div>
+
+      <UserReviewModal
+        userId={reviewUserId ?? ""}
+        open={reviewUserId !== null}
+        onClose={() => setReviewUserId(null)}
+        onSuccess={refreshUsers}
+        showAccountState={!isPendingPage}
+        showDeleteAction={!isPendingPage}
+      />
+      <AddUserModal
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        onSuccess={() => {
+          setInviteOpen(false)
+          refreshUsers()
+        }}
+      />
     </div>
   )
 }

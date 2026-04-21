@@ -18,10 +18,10 @@ export const TableRow = ({ className, ...props }: React.HTMLAttributes<HTMLTable
   <tr className={cn("border-b border-border transition-colors hover:bg-muted/50", className)} {...props} />
 )
 
-export const TableHead = ({ className, ...props }: React.HTMLAttributes<HTMLTableCellElement>) => (
+export const TableHead = ({ className, ...props }: React.ThHTMLAttributes<HTMLTableCellElement>) => (
   <th className={cn("h-10 px-4 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0", className)} {...props} />
 )
 
-export const TableCell = ({ className, ...props }: React.HTMLAttributes<HTMLTableCellElement>) => (
+export const TableCell = ({ className, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) => (
   <td className={cn("p-4 align-middle [&:has([role=checkbox])]:pr-0", className)} {...props} />
 )

@@ -4,6 +4,7 @@
  */
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1"
+const API_ROOT = API_BASE.replace(/\/api\/v1\/?$/, "")
 
 const AUTH_KEY = "smartrose_admin_token"
 
@@ -40,16 +41,59 @@ export async function login(
   return { token: data.access_token, user: data.user }
 }
 
+export async function fetchApiHealth(): Promise<{ status: string; message?: string }> {
+  const res = await fetch(`${API_ROOT}/health`)
+  if (!res.ok) throw new Error("Failed to fetch API health")
+  return res.json()
+}
+
+export async function fetchDbHealth(): Promise<{ status: string }> {
+  const res = await fetch(`${API_BASE}/db-health/`)
+  if (!res.ok) throw new Error("Failed to fetch database health")
+  return res.json()
+}
+
+export async function inviteUser(data: {
+  full_name: string
+  email: string
+  phone?: string
+  password: string
+  roles: ("farmer" | "florist")[]
+  location: {
+    name: string
+    type: "greenhouse" | "flower_shop"
+    address: string
+  }
+}): Promise<ApiUser> {
+  const token = getToken()
+  const res = await fetch(`${API_BASE}/auth/register`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(data),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to invite user")
+  }
+  const json = await res.json()
+  return json.user
+}
+
 function handleUnauthorized(): never {
   clearToken()
   window.location.href = "/login"
   throw new Error("Session expired")
 }
 
-export async function fetchUsers(): Promise<ApiUser[]> {
+export async function fetchUsers(status?: "approved" | "pending" | "rejected"): Promise<ApiUser[]> {
   const token = getToken()
   if (!token) handleUnauthorized()
-  const res = await fetch(`${API_BASE}/admin/users`, {
+  const url = status ? `${API_BASE}/admin/users?status=${status}` : `${API_BASE}/admin/users`
+  const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
   })
   if (res.status === 401) handleUnauthorized()
@@ -93,6 +137,279 @@ export async function updateUserStatus(userId: string, status: string): Promise<
   return data.user
 }
 
+export async function fetchUserWithLocations(userId: string): Promise<{
+  user: ApiUser
+  locations: ApiLocation[]
+}> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/users/${userId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("User not found")
+  if (!res.ok) throw new Error("Failed to fetch user")
+  const data = await res.json()
+  return { user: data.user, locations: data.locations ?? [] }
+}
+
+export async function updateUser(
+  userId: string,
+  data: { full_name?: string; phone?: string; role?: string; roles?: string[]; is_active?: boolean }
+): Promise<ApiUser> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/users/${userId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) throw new Error("Failed to update user")
+  const json = await res.json()
+  return json.user
+}
+
+export async function deleteUser(userId: string): Promise<void> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/users/${userId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("User not found")
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to delete user")
+  }
+}
+
+export async function changeUserPassword(
+  userId: string,
+  newPassword: string
+): Promise<void> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/users/${userId}/password`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({ new_password: newPassword }),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("User not found")
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to change password")
+  }
+}
+
+export async function updateLocation(
+  locationId: string,
+  data: { name?: string; type?: string; address?: string; is_active?: boolean }
+): Promise<ApiLocation> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/locations/${locationId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) throw new Error("Failed to update location")
+  const json = await res.json()
+  return json.location
+}
+
+export async function deleteLocation(locationId: string): Promise<void> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/locations/${locationId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("Location not found")
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to delete location")
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Base stations (admin) — EOSM
+// ---------------------------------------------------------------------------
+
+export interface ApiBaseStation {
+  _id: string
+  user_id: string
+  name: string
+  serial: string
+  last_seen?: string | null
+  created_at?: string
+  updated_at?: string
+  user_name?: string
+}
+
+export async function fetchBaseStations(params?: { user_id?: string }): Promise<ApiBaseStation[]> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const q = new URLSearchParams()
+  if (params?.user_id) q.set("user_id", params.user_id)
+  const url = q.toString() ? `${API_BASE}/admin/base-stations?${q}` : `${API_BASE}/admin/base-stations`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) throw new Error("Failed to fetch base stations")
+  const data = await res.json()
+  return data.base_stations ?? []
+}
+
+export async function createBaseStation(data: {
+  user_id: string
+  name: string
+  serial: string
+}): Promise<ApiBaseStation> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/base-stations`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to create base station")
+  }
+  const json = await res.json()
+  return json.base_station
+}
+
+export async function updateBaseStation(
+  baseStationId: string,
+  data: { name?: string; serial?: string }
+): Promise<ApiBaseStation> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/base-stations/${baseStationId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to update base station")
+  }
+  const json = await res.json()
+  return json.base_station
+}
+
+export async function deleteBaseStation(baseStationId: string): Promise<void> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/base-stations/${baseStationId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to delete base station")
+  }
+}
+
+export async function fetchLocations(): Promise<ApiLocation[]> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/locations`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) throw new Error("Failed to fetch locations")
+  const data = await res.json()
+  return data.locations ?? []
+}
+
+export async function createGreenhouse(data: {
+  user_id: string
+  name: string
+  address: string
+}): Promise<ApiLocation> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/locations`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      user_id: data.user_id,
+      name: data.name,
+      type: "greenhouse",
+      address: data.address,
+    }),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("User not found")
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to create greenhouse")
+  }
+  const json = await res.json()
+  return json.location
+}
+
+export async function createFlowerShop(data: {
+  user_id: string
+  name: string
+  address: string
+}): Promise<ApiLocation> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/locations`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      user_id: data.user_id,
+      name: data.name,
+      type: "flower_shop",
+      address: data.address,
+    }),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("User not found")
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to create flower shop")
+  }
+  const json = await res.json()
+  return json.location
+}
+
 /** Raw user from backend API */
 export interface ApiUser {
   _id: string
@@ -100,9 +417,178 @@ export interface ApiUser {
   email: string
   phone?: string
   role: string
+  roles: string[]
   status: string
   created_at: string
   updated_at?: string
   last_login?: string
   is_active: boolean
+  greenhouse_count?: number
+  flower_shop_count?: number
+}
+
+export async function searchApprovedUsers(query: string): Promise<SearchResult[]> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/search?q=${encodeURIComponent(query)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) throw new Error("Search failed")
+  const data = await res.json()
+  return data.results ?? []
+}
+
+export async function createDevice(data: {
+  location_id: string
+  user_id: string
+  base_station_id?: string | null
+  name: string
+  type: string
+  device_serial_number: string
+}): Promise<ApiDevice> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const body: Record<string, unknown> = {
+    location_id: data.location_id,
+    user_id: data.user_id,
+    name: data.name,
+    type: data.type,
+    device_serial_number: data.device_serial_number,
+  }
+  if (data.base_station_id != null && data.base_station_id !== "") {
+    body.base_station_id = data.base_station_id
+  }
+  const res = await fetch(`${API_BASE}/admin/devices`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to create device")
+  }
+  const json = await res.json()
+  return json.device
+}
+
+export async function fetchDevices(params?: {
+  location_id?: string
+  user_id?: string
+}): Promise<ApiDevice[]> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const search = new URLSearchParams(params as Record<string, string>).toString()
+  const url = search ? `${API_BASE}/admin/devices?${search}` : `${API_BASE}/admin/devices`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (res.status === 401) handleUnauthorized()
+  if (!res.ok) throw new Error("Failed to fetch devices")
+  const data = await res.json()
+  return data.devices ?? []
+}
+
+export async function updateDevice(
+  deviceId: string,
+  data: { name?: string; type?: string; device_serial_number?: string; base_station_id?: string | null }
+): Promise<ApiDevice> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const body: Record<string, unknown> = {}
+  if (data.name !== undefined) body.name = data.name
+  if (data.type !== undefined) body.type = data.type
+  if (data.device_serial_number !== undefined) body.device_serial_number = data.device_serial_number
+  if (data.base_station_id !== undefined) body.base_station_id = data.base_station_id === "" ? null : data.base_station_id
+  const res = await fetch(`${API_BASE}/admin/devices/${deviceId}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("Device not found")
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to update device")
+  }
+  const json = await res.json()
+  return json.device
+}
+
+export async function deleteDevice(deviceId: string): Promise<void> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const res = await fetch(`${API_BASE}/admin/devices/${deviceId}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("Device not found")
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.detail ?? "Failed to delete device")
+  }
+}
+
+export async function fetchDeviceSensorData(
+  deviceId: string,
+  limit?: number
+): Promise<{ device: ApiDevice; readings: unknown[]; count: number }> {
+  const token = getToken()
+  if (!token) handleUnauthorized()
+  const url = limit
+    ? `${API_BASE}/admin/devices/${deviceId}/sensor-data?limit=${limit}`
+    : `${API_BASE}/admin/devices/${deviceId}/sensor-data`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (res.status === 401) handleUnauthorized()
+  if (res.status === 404) throw new Error("Device not found")
+  if (!res.ok) throw new Error("Failed to fetch sensor data")
+  const data = await res.json()
+  return {
+    device: data.device,
+    readings: data.readings ?? [],
+    count: data.count ?? 0,
+  }
+}
+
+export interface SearchResult {
+  user: ApiUser
+  locations: ApiLocation[]
+}
+
+export interface ApiDevice {
+  _id: string
+  location_id: string
+  user_id: string
+  base_station_id?: string | null
+  name: string
+  type: string
+  device_serial_number: string
+  location_name?: string
+  user_name?: string
+  base_station_serial?: string
+  last_seen?: string
+  created_at?: string
+  updated_at?: string
+}
+
+/** Raw location from backend API */
+export interface ApiLocation {
+  _id: string
+  user_id: string
+  name: string
+  type: string
+  address: string
+  owner_name?: string
+  owner_email?: string
+  created_at?: string
+  updated_at?: string
+  is_active?: boolean
 }
