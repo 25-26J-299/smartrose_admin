@@ -14,14 +14,14 @@ export const mockStats: SystemStats = {
 }
 
 export const mockUsers: User[] = [
-  { id: "u1", name: "Samantha Perera", email: "samantha@farm.lk", role: "farmer", is_active: true, subscription_tier: "pro", greenhouse_count: 3, created_at: "2025-10-01", last_login: "2026-02-23" },
-  { id: "u2", name: "Nimal Silva", email: "nimal@florist.lk", role: "florist", is_active: true, subscription_tier: "basic", greenhouse_count: 1, created_at: "2025-11-15", last_login: "2026-02-22" },
-  { id: "u3", name: "Priya Fernando", email: "priya@rose.lk", role: "farmer", is_active: false, subscription_tier: "basic", greenhouse_count: 2, created_at: "2025-09-20", last_login: "2026-01-10" },
-  { id: "u4", name: "Kamal Bandara", email: "kamal@greenhouse.lk", role: "farmer", is_active: true, subscription_tier: "enterprise", greenhouse_count: 8, created_at: "2025-08-01", last_login: "2026-02-23" },
-  { id: "u5", name: "Dilani Jayawardena", email: "dilani@flowers.lk", role: "florist", is_active: true, subscription_tier: "pro", greenhouse_count: 2, created_at: "2025-12-05", last_login: "2026-02-21" },
-  { id: "u6", name: "Ruwan Wijeratne", email: "ruwan@agri.lk", role: "farmer", is_active: true, subscription_tier: "basic", greenhouse_count: 1, created_at: "2026-01-10", last_login: "2026-02-20" },
-  { id: "u7", name: "Chamali Ranasinghe", email: "chamali@bloom.lk", role: "farmer", is_active: true, subscription_tier: "pro", greenhouse_count: 4, created_at: "2025-07-15", last_login: "2026-02-23" },
-  { id: "u8", name: "Saman Kumara", email: "saman@garden.lk", role: "florist", is_active: false, subscription_tier: "basic", greenhouse_count: 0, created_at: "2026-01-25", last_login: "2026-02-01" },
+  { id: "u1", name: "Samantha Perera", email: "samantha@farm.lk", role: "farmer", is_active: true, subscription_tier: "pro", greenhouse_count: 3, flower_shop_count: 0, created_at: "2025-10-01", last_login: "2026-02-23" },
+  { id: "u2", name: "Nimal Silva", email: "nimal@florist.lk", role: "florist", is_active: true, subscription_tier: "basic", greenhouse_count: 1, flower_shop_count: 2, created_at: "2025-11-15", last_login: "2026-02-22" },
+  { id: "u3", name: "Priya Fernando", email: "priya@rose.lk", role: "farmer", is_active: false, subscription_tier: "basic", greenhouse_count: 2, flower_shop_count: 0, created_at: "2025-09-20", last_login: "2026-01-10" },
+  { id: "u4", name: "Kamal Bandara", email: "kamal@greenhouse.lk", role: "farmer", is_active: true, subscription_tier: "enterprise", greenhouse_count: 8, flower_shop_count: 0, created_at: "2025-08-01", last_login: "2026-02-23" },
+  { id: "u5", name: "Dilani Jayawardena", email: "dilani@flowers.lk", role: "florist", is_active: true, subscription_tier: "pro", greenhouse_count: 2, flower_shop_count: 3, created_at: "2025-12-05", last_login: "2026-02-21" },
+  { id: "u6", name: "Ruwan Wijeratne", email: "ruwan@agri.lk", role: "farmer", is_active: true, subscription_tier: "basic", greenhouse_count: 1, flower_shop_count: 0, created_at: "2026-01-10", last_login: "2026-02-20" },
+  { id: "u7", name: "Chamali Ranasinghe", email: "chamali@bloom.lk", role: "farmer", is_active: true, subscription_tier: "pro", greenhouse_count: 4, flower_shop_count: 0, created_at: "2025-07-15", last_login: "2026-02-23" },
+  { id: "u8", name: "Saman Kumara", email: "saman@garden.lk", role: "florist", is_active: false, subscription_tier: "basic", greenhouse_count: 0, flower_shop_count: 1, created_at: "2026-01-25", last_login: "2026-02-01" },
 ]
 
 export const mockGreenhouses: Greenhouse[] = [

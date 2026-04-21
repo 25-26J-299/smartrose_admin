@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/Card"
 import { Badge } from "@/components/ui/Badge"
 import { Button } from "@/components/ui/Button"
 import { fetchApiHealth, fetchDbHealth, fetchDevices, fetchLocations, fetchUsers } from "@/lib/api"
-import { CheckCircle2, XCircle, AlertCircle, Server, Database, Users, Warehouse, Cpu, Loader2 } from "lucide-react"
+import { CheckCircle2, XCircle, AlertCircle, Server, Users, Warehouse, Cpu, Loader2 } from "lucide-react"
 
 type ServiceStatus = "healthy" | "down"
 
