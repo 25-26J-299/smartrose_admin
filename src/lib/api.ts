@@ -1,9 +1,20 @@
 /**
  * API client for SmartRose backend.
- * Set VITE_API_BASE_URL in .env or .env.local (default: http://localhost:8000/api/v1)
+ * - Local dev: default http://localhost:8000/api/v1
+ * - Production build: default https://api.smartroseiot.com/api/v1
+ * Override anytime with VITE_API_BASE_URL in .env / .env.production
  */
+function resolveApiBase(): string {
+  const raw = import.meta.env.VITE_API_BASE_URL
+  if (typeof raw === "string" && raw.trim() !== "") {
+    return raw.replace(/\/$/, "")
+  }
+  return import.meta.env.DEV
+    ? "http://localhost:8000/api/v1"
+    : "https://api.smartroseiot.com/api/v1"
+}
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1"
+const API_BASE = resolveApiBase()
 const API_ROOT = API_BASE.replace(/\/api\/v1\/?$/, "")
 
 const AUTH_KEY = "smartrose_admin_token"
@@ -20,12 +31,28 @@ export function clearToken(): void {
   localStorage.removeItem(AUTH_KEY)
 }
 
+/** Normalize user JSON: some proxies/clients may expose Mongo id as `id` instead of `_id`. */
+function normalizeApiUser(u: ApiUser): ApiUser {
+  const any = u as ApiUser & { id?: string }
+  if (any._id) return any
+  if (any.id) return { ...any, _id: any.id }
+  return any
+}
+
+async function readErrorDetail(res: Response): Promise<string | undefined> {
+  const err = await res.json().catch(() => null as unknown)
+  if (!err || typeof err !== "object") return undefined
+  const detail = (err as { detail?: unknown }).detail
+  if (typeof detail === "string") return detail
+  return undefined
+}
+
 export async function login(
   email: string,
   password: string
 ): Promise<{
   token: string
-  user: { id: string; full_name: string; email: string; role: string }
+  user: ApiUser
 }> {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
@@ -38,7 +65,7 @@ export async function login(
   }
   const data = await res.json()
   setToken(data.access_token)
-  return { token: data.access_token, user: data.user }
+  return { token: data.access_token, user: normalizeApiUser(data.user) }
 }
 
 export async function fetchApiHealth(): Promise<{ status: string; message?: string }> {
@@ -80,7 +107,7 @@ export async function inviteUser(data: {
     throw new Error(err.detail ?? "Failed to invite user")
   }
   const json = await res.json()
-  return json.user
+  return normalizeApiUser(json.user)
 }
 
 function handleUnauthorized(): never {
@@ -100,7 +127,8 @@ export async function fetchUsers(status?: "approved" | "pending" | "rejected"): 
   if (res.status === 403) throw new Error("Admin access required")
   if (!res.ok) throw new Error("Failed to fetch users")
   const data = await res.json()
-  return data.users ?? []
+  const users = (data.users ?? []) as ApiUser[]
+  return users.map(normalizeApiUser)
 }
 
 export async function updateUserRole(userId: string, role: string): Promise<ApiUser> {
@@ -117,7 +145,7 @@ export async function updateUserRole(userId: string, role: string): Promise<ApiU
   if (res.status === 401) handleUnauthorized()
   if (!res.ok) throw new Error("Failed to update role")
   const data = await res.json()
-  return data.user
+  return normalizeApiUser(data.user)
 }
 
 export async function updateUserStatus(userId: string, status: string): Promise<ApiUser> {
@@ -134,7 +162,7 @@ export async function updateUserStatus(userId: string, status: string): Promise<
   if (res.status === 401) handleUnauthorized()
   if (!res.ok) throw new Error("Failed to update status")
   const data = await res.json()
-  return data.user
+  return normalizeApiUser(data.user)
 }
 
 export async function fetchUserWithLocations(userId: string): Promise<{
@@ -147,10 +175,16 @@ export async function fetchUserWithLocations(userId: string): Promise<{
     headers: { Authorization: `Bearer ${token}` },
   })
   if (res.status === 401) handleUnauthorized()
-  if (res.status === 404) throw new Error("User not found")
+  if (res.status === 404) {
+    const d = await readErrorDetail(res)
+    throw new Error(d ?? "User not found")
+  }
   if (!res.ok) throw new Error("Failed to fetch user")
   const data = await res.json()
-  return { user: data.user, locations: data.locations ?? [] }
+  return {
+    user: normalizeApiUser(data.user),
+    locations: data.locations ?? [],
+  }
 }
 
 export async function updateUser(
@@ -170,7 +204,7 @@ export async function updateUser(
   if (res.status === 401) handleUnauthorized()
   if (!res.ok) throw new Error("Failed to update user")
   const json = await res.json()
-  return json.user
+  return normalizeApiUser(json.user)
 }
 
 export async function deleteUser(userId: string): Promise<void> {
@@ -183,7 +217,10 @@ export async function deleteUser(userId: string): Promise<void> {
     },
   })
   if (res.status === 401) handleUnauthorized()
-  if (res.status === 404) throw new Error("User not found")
+  if (res.status === 404) {
+    const d = await readErrorDetail(res)
+    throw new Error(d ?? "User not found")
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail ?? "Failed to delete user")
@@ -205,7 +242,10 @@ export async function changeUserPassword(
     body: JSON.stringify({ new_password: newPassword }),
   })
   if (res.status === 401) handleUnauthorized()
-  if (res.status === 404) throw new Error("User not found")
+  if (res.status === 404) {
+    const d = await readErrorDetail(res)
+    throw new Error(d ?? "User not found")
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail ?? "Failed to change password")
@@ -371,7 +411,10 @@ export async function createGreenhouse(data: {
     }),
   })
   if (res.status === 401) handleUnauthorized()
-  if (res.status === 404) throw new Error("User not found")
+  if (res.status === 404) {
+    const d = await readErrorDetail(res)
+    throw new Error(d ?? "User not found")
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail ?? "Failed to create greenhouse")
@@ -401,7 +444,10 @@ export async function createFlowerShop(data: {
     }),
   })
   if (res.status === 401) handleUnauthorized()
-  if (res.status === 404) throw new Error("User not found")
+  if (res.status === 404) {
+    const d = await readErrorDetail(res)
+    throw new Error(d ?? "User not found")
+  }
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     throw new Error(err.detail ?? "Failed to create flower shop")
@@ -436,7 +482,8 @@ export async function searchApprovedUsers(query: string): Promise<SearchResult[]
   if (res.status === 401) handleUnauthorized()
   if (!res.ok) throw new Error("Search failed")
   const data = await res.json()
-  return data.results ?? []
+  const results = (data.results ?? []) as SearchResult[]
+  return results.map((r) => ({ ...r, user: normalizeApiUser(r.user) }))
 }
 
 export async function createDevice(data: {

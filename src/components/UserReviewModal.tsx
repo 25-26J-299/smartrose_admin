@@ -226,7 +226,7 @@ export function UserReviewModal({
     if (!user) return
     setPasswordActioning(true)
     try {
-      await changeUserPassword(user._id, newPassword)
+      await changeUserPassword(userId, newPassword)
       setPasswordSuccess(true)
       setNewPassword("")
       setConfirmPassword("")
