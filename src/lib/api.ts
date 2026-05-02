@@ -40,11 +40,17 @@ function normalizeApiUser(u: ApiUser): ApiUser {
 }
 
 async function readErrorDetail(res: Response): Promise<string | undefined> {
-  const err = await res.json().catch(() => null as unknown)
-  if (!err || typeof err !== "object") return undefined
-  const detail = (err as { detail?: unknown }).detail
-  if (typeof detail === "string") return detail
-  return undefined
+  const text = await res.text()
+  if (!text) return undefined
+  try {
+    const err = JSON.parse(text) as { detail?: unknown }
+    const detail = err.detail
+    if (typeof detail === "string") return detail
+    return undefined
+  } catch {
+    const t = text.trim()
+    return t.length > 180 ? `${t.slice(0, 180)}…` : t
+  }
 }
 
 export async function login(
@@ -234,7 +240,7 @@ export async function changeUserPassword(
   const token = getToken()
   if (!token) handleUnauthorized()
   const res = await fetch(`${API_BASE}/admin/users/${userId}/password`, {
-    method: "PATCH",
+    method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
